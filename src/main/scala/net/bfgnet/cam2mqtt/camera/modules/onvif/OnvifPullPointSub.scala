@@ -1,0 +1,133 @@
+package net.bfgnet.cam2mqtt.camera.modules.onvif
+
+import java.io.IOException
+
+import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
+import akka.actor.typed.{ActorRef, Behavior, PostStop}
+import net.bfgnet.cam2mqtt.camera.CameraConfig.CameraInfo
+import net.bfgnet.cam2mqtt.camera.CameraProtocol.{CameraAvailableEvent, CameraCmd, CameraEvent, CameraModuleEvent, CameraMotionEvent}
+import net.bfgnet.cam2mqtt.camera.modules.onvif.OnvifSubProtocol._
+import net.bfgnet.cam2mqtt.onvif.OnvifRequests
+import net.bfgnet.cam2mqtt.onvif.OnvifSubscriptionRequests.SubscriptionInfo
+import net.bfgnet.cam2mqtt.utils.ActorContextImplicits
+import org.jsoup.Jsoup
+import org.jsoup.parser.Parser
+
+import scala.concurrent.duration._
+import scala.util.{Failure, Success}
+
+object OnvifPullPointSub extends ActorContextImplicits {
+
+    def apply(parent: ActorRef[CameraCmd], info: CameraInfo): Behavior[OnvifSubCmd] = stopped(parent, info)
+
+    private def stopped(parent: ActorRef[CameraCmd], info: CameraInfo): Behavior[OnvifSubCmd] = {
+        Behaviors.setup { implicit context =>
+            context.setLoggerName(OnvifPullPointSub.getClass)
+
+            // create subscription on start
+            context.log.debug(s"starting pullpoint subscription on device ${info}")
+            val subs = OnvifRequests.createPullPointSubscription(info.host, info.port, info.username, info.password, 60)
+            context.pipeToSelf(subs) {
+                case Success(value) => Subscribed(value)
+                case Failure(err) => SubscriptionError(err)
+            }
+
+            Behaviors.receiveMessagePartial[OnvifSubCmd] {
+                case Subscribed(sub) =>
+                    notifyAvailability(parent, info.cameraId, available = true)
+                    context.self ! PullMessages
+                    subscribed(parent, info, sub)
+                case SubscriptionError(err) =>
+                    context.log.error("subscription error", err)
+                    notifyAvailability(parent, info.cameraId, available = false)
+                    Behaviors.stopped
+            }
+        }
+    }
+
+    private def subscribed(parent: ActorRef[CameraCmd], info: CameraInfo, subscription: SubscriptionInfo): Behavior[OnvifSubCmd] = {
+        Behaviors.setup { implicit context =>
+            context.log.debug(s"pullpoint subscription renewed: millis remaining until next renew = ${subscription.terminationTime - System.currentTimeMillis()}")
+            val timeToRenew = subscription.terminationTime - System.currentTimeMillis() - 15
+            // TODO: cancel this if actor dies. lo mismo en la subscripcion webhook
+            val renewEv = context.scheduleOnce(timeToRenew.millis, context.self, RenewSubscription)
+            Behaviors.receiveMessagePartial[OnvifSubCmd] {
+                case RenewSubscription =>
+                    context.log.debug(s"Renew subscription")
+                    val subs = OnvifRequests.renewSubscription(info.host, info.port, info.username, info.password, subscription.address, 60, subscription.isPullPointSub)
+                    context.pipeToSelf(subs) {
+                        case Success(value) => Subscribed(value)
+                        case Failure(err) => SubscriptionError(err)
+                    }
+                    Behaviors.same
+                case Subscribed(sub) =>
+                    subscribed(parent, info, sub)
+                case SubscriptionError(err: IOException) =>
+                    context.log.error("subscription IO error", err)
+                    notifyAvailability(parent, info.cameraId, available = false)
+                    context.self ! TerminateSubscription
+                    Behaviors.same
+                case SubscriptionError(err) =>
+                    context.log.error("subscription error", err)
+                    notifyAvailability(parent, info.cameraId, available = false)
+                    throw err
+                case Unsubscribed =>
+                    Behaviors.stopped
+                case PullPointEvents(camId, events) =>
+                    // Send camera event to parent
+                    events.map(e => CameraModuleEvent(camId, OnvifModule.moduleId, e)).foreach(parent ! _)
+                    // keep pulling messages
+                    context.self ! PullMessages
+                    Behaviors.same
+                case PullMessages =>
+                    // pull messages from subscription
+                    val pullMsgs = OnvifRequests.pullMessagesFromSubscription(info.host, info.port, info.username, info.password, subscription.address, 10)
+                    context.pipeToSelf(pullMsgs) {
+                        case Success(value) =>
+                            val messages = parsePullPointMessage(info.cameraId, value).map(List(_)).getOrElse(Nil)
+                            context.log.trace(s"pulled ${messages.size} messages")
+                            PullPointEvents(info.cameraId, messages)
+                        case Failure(err) => SubscriptionError(err)
+                    }
+                    Behaviors.same
+                case TerminateSubscription =>
+                    // cleanup resources on device
+                    val f = OnvifRequests.unsubscribe(info.host, info.port, info.username, info.password, subscription.address)
+                    context.pipeToSelf(f)(_ => Unsubscribed)
+                    finishing()
+            }.receiveSignal {
+                case (_, PostStop) =>
+                    OnvifRequests.unsubscribe(info.host, info.port, info.username, info.password, subscription.address)
+                    renewEv.cancel()
+                    finishing()
+            }
+        }
+    }
+
+    private def finishing(): Behavior[OnvifSubCmd] = {
+        Behaviors.receiveMessagePartial[OnvifSubCmd] {
+            case Unsubscribed =>
+                Behaviors.stopped
+        }
+    }
+
+    private def parsePullPointMessage(id: String, xml: String): Option[CameraEvent] = {
+        val doc = Jsoup.parse(xml, "", Parser.xmlParser())
+        val notif = doc.select("*|Envelope > *|Body > *|PullMessagesResponse > *|NotificationMessage")
+        val topic = notif.select("*|Topic").text()
+        topic match {
+            case "tns1:RuleEngine/CellMotionDetector/Motion" =>
+                val motion = notif.select("*|Message > *|Data > *|SimpleItem[Name='IsMotion']")
+                if (!motion.isEmpty) {
+                    val isMotion = motion.attr("Value") == "true"
+                    Option(CameraMotionEvent(id, OnvifModule.moduleId, isMotion))
+                } else None
+            case _ => None
+        }
+    }
+
+    private def notifyAvailability(parent: ActorRef[CameraCmd], cameraId: String, available: Boolean) = {
+        parent ! CameraModuleEvent(cameraId, OnvifModule.moduleId, CameraAvailableEvent(cameraId, available))
+    }
+
+}

@@ -1,0 +1,32 @@
+mqtt:
+  host: 192.168.0.1
+  port: 1883
+  username: user
+  password: pass
+  #base_name: cam2mqtt
+  ssl: false
+
+webhook:
+  external_url: http://192.168.0.1:8080 # only needed for webhook subscriptions
+
+cameras:
+  reolink_cam_1:
+    host: 192.168.4.1
+    port: 8000
+    username: admin
+    password: somepass
+    modules:
+      onvif:
+        monitor_events: true
+        prefer_webhook_subscription: false
+      reolink:
+        sync_datetime: false
+  onvif_cam_1:
+    host: 192.168.4.2
+    port: 8000
+    username: admin
+    password: somepass
+    modules:
+      onvif:
+        monitor_events: true
+        prefer_webhook_subscription: false

@@ -1,0 +1,6 @@
+build/
+out/
+.gradle/
+.idea/
+src/test
+config.dev.yml

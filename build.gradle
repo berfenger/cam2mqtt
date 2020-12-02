@@ -1,0 +1,52 @@
+buildscript {
+    ext.version = '1.0-SNAPSHOT'
+    ext.scala_version_base = '2.13'
+    ext.scala_version = '2.13.3'
+    ext.akka_version = '2.6.10'
+    ext.akka_http_version = '10.2.1'
+}
+
+plugins {
+    id 'java'
+    id 'scala'
+    id 'application'
+}
+
+group 'net.bfgnet.cam2mqtt'
+version '1.0-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+}
+
+application {
+    mainClassName = 'net.bfgnet.cam2mqtt.App'
+}
+
+distTar.enabled = false
+distZip.archiveName('cam2mqtt.zip')
+
+test.onlyIf { Boolean.getBoolean('run.tests') }
+
+dependencies {
+    testCompile group: 'junit', name: 'junit', version: '4.12'
+    // Scala
+    compile "org.scala-lang:scala-library:$scala_version"
+    // Akka / Jackson
+    compile "com.typesafe.akka:akka-actor-typed_$scala_version_base:$akka_version"
+    compile "com.typesafe.akka:akka-stream_$scala_version_base:$akka_version"
+    compile "com.typesafe.akka:akka-http_$scala_version_base:$akka_http_version"
+    compile "com.lightbend.akka:akka-stream-alpakka-mqtt_$scala_version_base:2.0.2"
+
+    // Utils
+    compile "commons-codec:commons-codec:1.15"
+    compile "org.jsoup:jsoup:1.13.1"
+    compile "ch.qos.logback:logback-classic:1.2.3"
+    compile "org.codehaus.jettison:jettison:1.4.1"
+    compile "com.fasterxml.jackson.core:jackson-databind:2.11.3"
+    compile "com.fasterxml.jackson.module:jackson-module-scala_$scala_version_base:2.11.3"
+
+    // Config
+    compile "io.circe:circe-generic-extras_$scala_version_base:0.13.0"
+    compile "io.circe:circe-yaml_$scala_version_base:0.13.1"
+}
