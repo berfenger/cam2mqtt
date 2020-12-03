@@ -1,7 +1,6 @@
 package net.bfgnet.cam2mqtt.camera.modules
 
 import akka.actor.typed.{ActorRef, Behavior}
-import net.bfgnet.cam2mqtt.camera.CameraActionProtocol.CameraActionRequest
 import net.bfgnet.cam2mqtt.camera.CameraConfig.{CameraInfo, CameraModuleConfig}
 import net.bfgnet.cam2mqtt.camera.CameraProtocol.CameraCmd
 

@@ -15,13 +15,14 @@ import net.bfgnet.cam2mqtt.camera.modules.CameraModules
 import net.bfgnet.cam2mqtt.config.{ConfigManager, MqttConfig}
 import net.bfgnet.cam2mqtt.eventbus.CameraEventBus
 import net.bfgnet.cam2mqtt.mqtt.MqttProtocol._
-import net.bfgnet.cam2mqtt.mqtt.converters.CameraEventConverters._
 import net.bfgnet.cam2mqtt.utils.ActorContextImplicits
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.Try
+
+case class MqttBaseTopicProvider(base: String)
 
 object MqttProtocol {
 
@@ -83,7 +84,6 @@ object MqttSystem extends ActorContextImplicits {
                         CameraEventBus.bus.unsubscribe(act.toClassic)
                         failing()
                     case Terminate =>
-                        println("CRITICO: AQUI TERMINATE")
                         mqttStream.complete()
                         terminatingOk()
                 }

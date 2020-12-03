@@ -13,9 +13,7 @@ object CameraMan {
     private def initFromConfig(cameras: List[CameraInfo]): Behavior[CameraManCmd] =
         Behaviors.setup { context =>
             context.setLoggerName(CameraMan.getClass)
-            println("Starting cameraMan stdot")
-            context.log.debug(s"Starting cameraMan dbg")
-            context.log.info(s"Starting cameraMan info")
+            context.log.debug(s"Starting cameraMan from config")
 
             // init cameras from config
             cameras.foreach(context.self ! InitCam(_))
@@ -28,8 +26,7 @@ object CameraMan {
 
             Behaviors.receiveMessagePartial {
                 case InitCam(cam) =>
-                    context.log.debug(s"Starting cam dbg")
-                    context.log.info(s"Starting cam info")
+                    context.log.info(s"Starting cam $cam")
                     if (!monitored.contains(cam.cameraId)) {
                         val ref = context.spawn(Camera(cam), s"cam_${cam.cameraId}")
                         context.watch(ref)
@@ -57,7 +54,6 @@ object CameraMan {
                 if (remaining.nonEmpty)
                     finishing(remaining)
                 else {
-                    println("CameraMan TODOs hijos muertos")
                     Behaviors.stopped
                 }
         }

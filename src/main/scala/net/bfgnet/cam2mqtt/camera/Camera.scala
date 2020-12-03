@@ -1,11 +1,11 @@
 package net.bfgnet.cam2mqtt.camera
 
 import akka.actor.ActorSystem
-import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
 import akka.actor.typed.scaladsl.adapter._
-import akka.actor.typed.{ActorRef, Behavior, PostStop, PreRestart, SupervisorStrategy, Terminated}
+import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
+import akka.actor.typed._
 import net.bfgnet.cam2mqtt.camera.CameraConfig.CameraInfo
-import net.bfgnet.cam2mqtt.camera.CameraProtocol.{CameraAvailableEvent, CameraCmd, CameraModuleAction, CameraModuleEvent, CameraModuleMessage, CameraMotionEvent, TerminateCam}
+import net.bfgnet.cam2mqtt.camera.CameraProtocol._
 import net.bfgnet.cam2mqtt.camera.modules.CameraModules
 import net.bfgnet.cam2mqtt.eventbus.CameraEventBus
 

@@ -59,12 +59,10 @@ object O2MActorSystem {
     private def finishing(monitored: List[ActorRef[_]]): Behavior[O2MCommand] =
         Behaviors.receiveSignal {
             case (_, Terminated(a)) =>
-                println(s"ROOT SE ME MUERE ${a}")
                 val remaining = monitored.filterNot(_ == a)
                 if (remaining.nonEmpty)
                     finishing(remaining)
                 else {
-                    println("Root TODOs hijos muertos")
                     Behaviors.stopped
                 }
         }

@@ -19,7 +19,6 @@ object MqttCommands {
                         }
                         .map(CameraModuleAction(cameraId, moduleId, _))
                         .foreach { cmd =>
-                            println(s"MQTT COMMAND: ${cmd}")
                             O2MActorSystem.sendToCameraMan(RouteCameraCommand(cameraId, cmd))
                         }
             case _ =>

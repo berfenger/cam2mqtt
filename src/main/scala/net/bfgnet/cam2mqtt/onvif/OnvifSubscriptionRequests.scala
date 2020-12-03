@@ -58,9 +58,10 @@ trait OnvifSubscriptionRequests extends OnvifRequest with OnvifAuth {
 
         req(host, port, xml, List("action" -> OnvifSubscriptionTemplates.UNSUBSCRIBE_ACTION))
                 .map(parseUnsubscribeResponse)
-                .map(r => {
-                    println(s"UNSUBS: ${subscriptionAddress} = ${r}"); r
-                })
+                .map { r =>
+                    _as.classicSystem.log.debug(s"Subscription deleted on device: ${subscriptionAddress}")
+                    r
+                }
     }
 
     private def parseSubscriptionResponse(xml: String): SubscriptionInfo = {
