@@ -1,4 +1,4 @@
-FROM alpine:3.10.3
+FROM alpine:3.12.1
 
 RUN apk add --no-cache unzip openjdk8-jre
 
@@ -10,9 +10,9 @@ WORKDIR /usr/src/app
 
 RUN unzip /app_src/build/distributions/cam2mqtt.zip
 
-FROM alpine:3.10.3
+FROM alpine:3.12.1
 
-RUN apk add openjdk8-jre
+RUN apk add --no-cache openjdk8-jre tzdata ca-certificates
 
 COPY --from=0 /usr/src/app /usr/src/app
 

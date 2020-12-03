@@ -4,11 +4,11 @@ import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.{ActorRef, Behavior}
 import akka.stream.alpakka.mqtt.MqttMessage
 import akka.util.ByteString
-import net.bfgnet.cam2mqtt.camera.{CameraActionProtocol, CameraProtocol}
-import net.bfgnet.cam2mqtt.camera.CameraActionProtocol.{CameraActionRequest, CameraActionResponse, NightVisionMode, PTZMoveActionRequest, SetIrLightsActionRequest, SetMotionSensActionRequest, SetNightVisionActionRequest, ZVector}
+import net.bfgnet.cam2mqtt.camera.CameraActionProtocol._
 import net.bfgnet.cam2mqtt.camera.CameraConfig.{CameraInfo, CameraModuleConfig, ReolinkCameraModuleConfig}
-import net.bfgnet.cam2mqtt.camera.CameraProtocol.{CameraAvailableEvent, CameraCmd, CameraModuleAction, CameraModuleEvent, CameraStateBoolEvent, CameraStateIntEvent, CameraStateStringEvent, TerminateCam, WrappedModuleCmd}
+import net.bfgnet.cam2mqtt.camera.CameraProtocol._
 import net.bfgnet.cam2mqtt.camera.modules.{CameraModule, MqttCameraModule}
+import net.bfgnet.cam2mqtt.camera.{CameraActionProtocol, CameraProtocol}
 import net.bfgnet.cam2mqtt.reolink.{ReolinkCmdResponse, ReolinkHost, ReolinkRequests}
 import net.bfgnet.cam2mqtt.utils.ActorContextImplicits
 
@@ -17,9 +17,9 @@ import scala.util.{Failure, Success, Try}
 sealed trait ReolinkResponse
 
 object ReolinkCapabilities {
-    def defaultCapabilities = ReolinkCapabilities(nightVision = false, irlights = false, motionSens = false, ptzZoom = false)
+    def defaultCapabilities: ReolinkCapabilities = ReolinkCapabilities(nightVision = false, irlights = false, motionSens = false, ptzZoom = false)
 
-    def defautlState = ReolinkState(None, None, None, None)
+    def defaultState: ReolinkState = ReolinkState(None, None, None, None)
 }
 
 case class ReolinkCapabilities(nightVision: Boolean, irlights: Boolean, motionSens: Boolean, ptzZoom: Boolean)
@@ -77,11 +77,11 @@ object ReolinkModule extends CameraModule with MqttCameraModule with ActorContex
                     case Failure(exception) => WrappedModuleCmd(Option(exception))
                 }
                 Behaviors.receiveMessagePartial[CameraCmd] {
-                    case WrappedModuleCmd(err: Option[Throwable]) =>
+                    case WrappedModuleCmd(Some(err: Throwable)) =>
                         // on error, just print it. restarting won't get any better
-                        err.foreach { ex =>
-                            context.log.error("error updating time", ex)
-                        }
+                        context.log.error("error updating time", err)
+                        gettingState(setup)
+                    case WrappedModuleCmd(None) =>
                         gettingState(setup)
                     case WrappedModuleCmd("nu") =>
                         context.log.info(s"no need to update camera time on ${setup.camera.cameraId}")
@@ -106,7 +106,7 @@ object ReolinkModule extends CameraModule with MqttCameraModule with ActorContex
                 case Success(value) => WrappedModuleCmd(value)
                 case Failure(exception) =>
                     context.log.error(s"could not get reolink capabilities from device ${setup.camera.cameraId}", exception)
-                    WrappedModuleCmd(ReolinkInitialState(ReolinkCapabilities.defaultCapabilities, ReolinkCapabilities.defautlState))
+                    WrappedModuleCmd(ReolinkInitialState(ReolinkCapabilities.defaultCapabilities, ReolinkCapabilities.defaultState))
             }
             Behaviors.receiveMessagePartial[CameraCmd] {
                 case WrappedModuleCmd(cmd: ReolinkInitialState) =>
@@ -255,15 +255,15 @@ object ReolinkModule extends CameraModule with MqttCameraModule with ActorContex
     override def eventToMqttMessage(ev: CameraProtocol.CameraEvent): Option[MqttMessage] = ev match {
         case CameraStateBoolEvent(cameraId, moduleId, param, state) if CAM_PARAMS.contains(param) =>
             val str = if (state) "on" else "off"
-            Some(MqttMessage(s"${cameraStateModulePath(cameraId, moduleId)}/${param}", ByteString(str)))
+            Some(MqttMessage(s"${cameraStateModulePath(cameraId, moduleId)}/$param", ByteString(str)))
         case CameraStateIntEvent(cameraId, moduleId, param, state) if CAM_PARAMS.contains(param) =>
-            Some(MqttMessage(s"${cameraStateModulePath(cameraId, moduleId)}/${param}", ByteString(state.toString)))
+            Some(MqttMessage(s"${cameraStateModulePath(cameraId, moduleId)}/$param", ByteString(state.toString)))
         case CameraStateStringEvent(cameraId, moduleId, param, state) if CAM_PARAMS.contains(param) =>
-            Some(MqttMessage(s"${cameraStateModulePath(cameraId, moduleId)}/${param}", ByteString(state)))
+            Some(MqttMessage(s"${cameraStateModulePath(cameraId, moduleId)}/$param", ByteString(state)))
         case _ => None
     }
 
-    private def updateNightVisionState(setup: Setup)(mode: NightVisionMode.Value) = {
+    private def updateNightVisionState(setup: Setup)(mode: NightVisionMode.Value): Unit = {
         val v = mode match {
             case NightVisionMode.ForceOn => "on"
             case NightVisionMode.ForceOff => "off"
@@ -272,15 +272,15 @@ object ReolinkModule extends CameraModule with MqttCameraModule with ActorContex
         setup.parent ! CameraModuleEvent(setup.camera.cameraId, moduleId, CameraStateStringEvent(setup.camera.cameraId, moduleId, CAM_PARAM_NIGHTVISION, v))
     }
 
-    private def updateIRLightsState(setup: Setup)(enabled: Boolean) = {
+    private def updateIRLightsState(setup: Setup)(enabled: Boolean): Unit  = {
         setup.parent ! CameraModuleEvent(setup.camera.cameraId, moduleId, CameraStateBoolEvent(setup.camera.cameraId, moduleId, CAM_PARAM_IRLIGHTS, enabled))
     }
 
-    private def updateZoomState(setup: Setup)(zoomLevel: Int) = {
+    private def updateZoomState(setup: Setup)(zoomLevel: Int): Unit  = {
         setup.parent ! CameraModuleEvent(setup.camera.cameraId, moduleId, CameraStateIntEvent(setup.camera.cameraId, moduleId, CAM_PARAM_ZOOM_ABS, zoomLevel))
     }
 
-    private def updateMotionSensState(setup: Setup)(motionSens: Int) = {
+    private def updateMotionSensState(setup: Setup)(motionSens: Int): Unit  = {
         setup.parent ! CameraModuleEvent(setup.camera.cameraId, moduleId, CameraStateIntEvent(setup.camera.cameraId, moduleId, CAM_PARAM_MOTION_SENS, motionSens))
     }
 }

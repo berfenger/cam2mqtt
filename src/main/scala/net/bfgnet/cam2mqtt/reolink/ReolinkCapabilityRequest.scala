@@ -11,7 +11,7 @@ import scala.util.Try
 trait ReolinkCapabilityRequest extends ReolinkRequest {
 
     def getCapabilities(host: ReolinkHost)
-                       (implicit _as: ClassicActorSystemProvider, _ec: ExecutionContext) = {
+                       (implicit _as: ClassicActorSystemProvider, _ec: ExecutionContext): Future[(ReolinkCapabilities, ReolinkState)] = {
         val cmds = List(
             ReolinkCmd("GetIrLights", 1, null),
             ReolinkCmd("GetIsp", 1, Channel(0)),
@@ -36,7 +36,7 @@ trait ReolinkCapabilityRequest extends ReolinkRequest {
     }
 
     private def parseCapsResult(resultList: List[(String, Either[ReolinkCmdResponseError, JSONObject])]): (ReolinkCapabilities, ReolinkState) = {
-        resultList.foldLeft((ReolinkCapabilities.defaultCapabilities, ReolinkCapabilities.defautlState))((a, b) => {
+        resultList.foldLeft((ReolinkCapabilities.defaultCapabilities, ReolinkCapabilities.defaultState))((a, b) => {
             parseCapabilities(a._1, a._2, b._1, b._2)
         })
     }

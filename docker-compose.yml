@@ -1,0 +1,13 @@
+version: '3.4'
+
+services:
+  cam2mqtt:
+    image: acasal/cam2mqtt:latest
+    restart: unless-stopped
+    volumes:
+      - ./config.yml:/config.yml
+    ports:
+      - "8080:8080"
+    environment:
+      # this will be the camera timezone when the camera type is updated by reolink module (reolink.sync_datetime = true)
+      - TZ=Europe/Paris
