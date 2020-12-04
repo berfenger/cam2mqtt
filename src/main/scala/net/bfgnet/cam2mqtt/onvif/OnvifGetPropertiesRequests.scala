@@ -7,17 +7,18 @@ import java.util.{Calendar, GregorianCalendar, TimeZone}
 import akka.actor.ClassicActorSystemProvider
 import net.bfgnet.cam2mqtt.onvif.OnvifGetPropertiesRequests.{OnvifCapabilitiesResponse, OnvifDateTimeResponse, OnvifEventPropertiesResponse}
 import net.bfgnet.cam2mqtt.onvif.OnvifGetPropertiesTemplates.DATETIME_PARSER
+import net.bfgnet.cam2mqtt.utils.DateTimeUtils
 import org.jsoup.Jsoup
 import org.jsoup.parser.Parser
 import org.jsoup.select.Elements
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 
 trait OnvifGetPropertiesRequests extends OnvifRequest with OnvifAuth {
 
     def getEventProperties(host: String, port: Int, username: String, password: String)
-                          (implicit _as: ClassicActorSystemProvider, _ec: ExecutionContext) = {
+                          (implicit _as: ClassicActorSystemProvider, _ec: ExecutionContext): Future[OnvifEventPropertiesResponse] = {
 
         val sign = auth(username, password)
         val xml = OnvifGetPropertiesTemplates.GET_EVPROPS_TMPL
@@ -32,7 +33,7 @@ trait OnvifGetPropertiesRequests extends OnvifRequest with OnvifAuth {
     }
 
     def getCapabilities(host: String, port: Int, username: String, password: String)
-                       (implicit _as: ClassicActorSystemProvider, _ec: ExecutionContext) = {
+                       (implicit _as: ClassicActorSystemProvider, _ec: ExecutionContext): Future[OnvifCapabilitiesResponse] = {
 
         val sign = auth(username, password)
         val xml = OnvifGetPropertiesTemplates.GET_CAPS_TMPL
@@ -43,7 +44,7 @@ trait OnvifGetPropertiesRequests extends OnvifRequest with OnvifAuth {
     }
 
     def getSystemDateTime(host: String, port: Int, username: String, password: String)
-                         (implicit _as: ClassicActorSystemProvider, _ec: ExecutionContext) = {
+                         (implicit _as: ClassicActorSystemProvider, _ec: ExecutionContext): Future[OnvifDateTimeResponse] = {
 
         val sign = auth(username, password)
         val xml = OnvifGetPropertiesTemplates.GET_DATETIME_TMPL
@@ -54,7 +55,7 @@ trait OnvifGetPropertiesRequests extends OnvifRequest with OnvifAuth {
     }
 
     def setManualSystemDateTime(host: String, port: Int, username: String, password: String, utcMillis: Long)
-                               (implicit _as: ClassicActorSystemProvider, _ec: ExecutionContext) = {
+                               (implicit _as: ClassicActorSystemProvider, _ec: ExecutionContext): Future[Boolean] = {
 
         val date = new GregorianCalendar()
         date.setTimeZone(TimeZone.getTimeZone(ZoneId.of("UTC")))
@@ -128,8 +129,7 @@ object OnvifGetPropertiesRequests {
 }
 
 private object OnvifGetPropertiesTemplates {
-    val DATETIME_PARSER = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss")
-    DATETIME_PARSER.setTimeZone(TimeZone.getTimeZone(ZoneId.of("UTC")))
+    def DATETIME_PARSER: SimpleDateFormat = DateTimeUtils.dateFormatter("yyyy-MM-dd'T'HH:mm:ss", ZoneId.of("UTC"))
 
     val GET_EVPROPS_TMPL =
         """<soap:Envelope xmlns:add="http://www.w3.org/2005/08/addressing" xmlns:b="http://docs.oasis-open.org/wsn/b-2" xmlns:soap="http://www.w3.org/2003/05/soap-envelope">

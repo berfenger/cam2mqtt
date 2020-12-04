@@ -2,20 +2,20 @@ package net.bfgnet.cam2mqtt.onvif
 
 import java.text.SimpleDateFormat
 import java.time.ZoneId
-import java.util.TimeZone
 
 import akka.actor.ClassicActorSystemProvider
 import net.bfgnet.cam2mqtt.onvif.OnvifSubscriptionRequests.SubscriptionInfo
+import net.bfgnet.cam2mqtt.utils.DateTimeUtils
 import org.jsoup.Jsoup
 import org.jsoup.parser.Parser
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, Future}
 
 trait OnvifSubscriptionRequests extends OnvifRequest with OnvifAuth {
 
     def subscribe(host: String, port: Int,
                   username: String, password: String, callbackAddress: String, timeSeconds: Long)
-                 (implicit _as: ClassicActorSystemProvider, _ec: ExecutionContext) = {
+                 (implicit _as: ClassicActorSystemProvider, _ec: ExecutionContext): Future[SubscriptionInfo] = {
 
         val sign = auth(username, password)
         val xml = OnvifSubscriptionTemplates.SUBSCRIBE_TMPL
@@ -29,7 +29,7 @@ trait OnvifSubscriptionRequests extends OnvifRequest with OnvifAuth {
 
     def renewSubscription(host: String, port: Int,
                           username: String, password: String, subscriptionAddress: String, timeSeconds: Long, isPullPointSub: Boolean)
-                         (implicit _as: ClassicActorSystemProvider, _ec: ExecutionContext) = {
+                         (implicit _as: ClassicActorSystemProvider, _ec: ExecutionContext): Future[SubscriptionInfo] = {
 
         val sign = auth(username, password)
         val xml = OnvifSubscriptionTemplates.RENEW_SUBS_TMPL
@@ -49,7 +49,7 @@ trait OnvifSubscriptionRequests extends OnvifRequest with OnvifAuth {
 
     def unsubscribe(host: String, port: Int,
                     username: String, password: String, subscriptionAddress: String)
-                   (implicit _as: ClassicActorSystemProvider, _ec: ExecutionContext) = {
+                   (implicit _as: ClassicActorSystemProvider, _ec: ExecutionContext): Future[Boolean] = {
 
         val sign = auth(username, password)
         val xml = OnvifSubscriptionTemplates.UNSUBSCRIBE_TMPL
@@ -59,7 +59,7 @@ trait OnvifSubscriptionRequests extends OnvifRequest with OnvifAuth {
         req(host, port, xml, List("action" -> OnvifSubscriptionTemplates.UNSUBSCRIBE_ACTION))
                 .map(parseUnsubscribeResponse)
                 .map { r =>
-                    _as.classicSystem.log.debug(s"Subscription deleted on device: ${subscriptionAddress}")
+                    _as.classicSystem.log.debug(s"Subscription deleted on device: $subscriptionAddress")
                     r
                 }
     }
@@ -106,8 +106,7 @@ object OnvifSubscriptionRequests {
 }
 
 private object OnvifSubscriptionTemplates {
-    val TIME_FMT = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'")
-    TIME_FMT.setTimeZone(TimeZone.getTimeZone(ZoneId.of("UTC")))
+    def TIME_FMT: SimpleDateFormat = DateTimeUtils.dateFormatter("yyyy-MM-dd'T'HH:mm:ss'Z'", ZoneId.of("UTC"))
 
     val SUBSCRIBE_TMPL =
         """<soap:Envelope xmlns:add="http://www.w3.org/2005/08/addressing" xmlns:b="http://docs.oasis-open.org/wsn/b-2" xmlns:soap="http://www.w3.org/2003/05/soap-envelope">

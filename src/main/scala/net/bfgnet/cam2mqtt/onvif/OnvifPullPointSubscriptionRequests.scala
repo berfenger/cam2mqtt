@@ -6,16 +6,17 @@ import java.util.TimeZone
 
 import akka.actor.ClassicActorSystemProvider
 import net.bfgnet.cam2mqtt.onvif.OnvifSubscriptionRequests.SubscriptionInfo
+import net.bfgnet.cam2mqtt.utils.DateTimeUtils
 import org.jsoup.Jsoup
 import org.jsoup.parser.Parser
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, Future}
 
 trait OnvifPullPointSubscriptionRequests extends OnvifRequest with OnvifAuth {
 
     def createPullPointSubscription(host: String, port: Int,
                                     username: String, password: String, timeSeconds: Long)
-                                   (implicit _as: ClassicActorSystemProvider, _ec: ExecutionContext) = {
+                                   (implicit _as: ClassicActorSystemProvider, _ec: ExecutionContext): Future[SubscriptionInfo] = {
 
         val sign = auth(username, password)
         val xml = OnvifPullPointSubscriptionTemplates.CREATE_PPS_TMPL
@@ -28,7 +29,7 @@ trait OnvifPullPointSubscriptionRequests extends OnvifRequest with OnvifAuth {
 
     def pullMessagesFromSubscription(host: String, port: Int,
                                      username: String, password: String, subscriptionId: String, timeoutSeconds: Long)
-                                    (implicit _as: ClassicActorSystemProvider, _ec: ExecutionContext) = {
+                                    (implicit _as: ClassicActorSystemProvider, _ec: ExecutionContext): Future[String] = {
 
         val sign = auth(username, password)
         val xml = OnvifPullPointSubscriptionTemplates.PULL_MSGS_TMPL
@@ -58,8 +59,8 @@ trait OnvifPullPointSubscriptionRequests extends OnvifRequest with OnvifAuth {
 }
 
 private object OnvifPullPointSubscriptionTemplates {
-    val TIME_FMT = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'")
-    TIME_FMT.setTimeZone(TimeZone.getTimeZone(ZoneId.of("UTC")))
+
+    def TIME_FMT: SimpleDateFormat = DateTimeUtils.dateFormatter("yyyy-MM-dd'T'HH:mm:ss'Z'", ZoneId.of("UTC"))
 
     val CREATE_PPS_TMPL =
         """<soap:Envelope xmlns:add="http://www.w3.org/2005/08/addressing" xmlns:b="http://docs.oasis-open.org/wsn/b-2" xmlns:soap="http://www.w3.org/2003/05/soap-envelope">

@@ -1,14 +1,14 @@
 package net.bfgnet.cam2mqtt.onvif
 
-import java.text.SimpleDateFormat
+import java.time.ZoneId
 import java.util.{Date, UUID}
 
-import net.bfgnet.cam2mqtt.onvif.OnvifAuth.{OnvifSign, TSF}
+import net.bfgnet.cam2mqtt.onvif.OnvifAuth.OnvifSign
+import net.bfgnet.cam2mqtt.utils.DateTimeUtils
 import org.apache.commons.codec.binary.Base64
 import org.apache.commons.codec.digest.DigestUtils
 
 object OnvifAuth {
-    private val TSF = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.000Z")
 
     case class OnvifSign(token: String, username: String, passwordDigest: String, nonce: String, created: String)
 
@@ -31,7 +31,7 @@ trait OnvifAuth {
         val _nonce = base64(raw_nonce)
 
         val ts = now()
-        //sha1(raw_nonce + created.encode("utf8") + self._password.encode("utf8"))
+
         val pwdDig = base64(sha1(raw_nonce ++ ts.getBytes("utf-8") ++ password.getBytes("utf-8")))
 
         OnvifSign(UUID.randomUUID().toString, username, pwdDig, _nonce, ts)
@@ -43,10 +43,10 @@ trait OnvifAuth {
 
     private def newNonce() = UUID.randomUUID().toString.getBytes("utf-8")
 
-    private def now() = TSF.format(new Date())
+    private def now() = DateTimeUtils.dateFormatter("yyyy-MM-dd'T'HH:mm:ss.000Z", ZoneId.systemDefault()).format(new Date())
 
     implicit class OnvifSignExt(sign: OnvifSign) {
-        def appliedToXML() = {
+        def appliedToXML(): String = {
             OnvifAuth.TMPL
                     .replace("{UsernameToken}", sign.token)
                     .replace("{Username}", sign.username)
