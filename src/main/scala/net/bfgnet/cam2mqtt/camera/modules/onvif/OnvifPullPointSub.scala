@@ -2,10 +2,10 @@ package net.bfgnet.cam2mqtt.camera.modules.onvif
 
 import java.io.IOException
 
-import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
+import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.{ActorRef, Behavior, PostStop}
 import net.bfgnet.cam2mqtt.camera.CameraConfig.CameraInfo
-import net.bfgnet.cam2mqtt.camera.CameraProtocol.{CameraAvailableEvent, CameraCmd, CameraEvent, CameraModuleEvent, CameraMotionEvent}
+import net.bfgnet.cam2mqtt.camera.CameraProtocol._
 import net.bfgnet.cam2mqtt.camera.modules.onvif.OnvifSubProtocol._
 import net.bfgnet.cam2mqtt.onvif.OnvifRequests
 import net.bfgnet.cam2mqtt.onvif.OnvifSubscriptionRequests.SubscriptionInfo
@@ -108,6 +108,8 @@ object OnvifPullPointSub extends ActorContextImplicits {
         Behaviors.receiveMessagePartial[OnvifSubCmd] {
             case Unsubscribed =>
                 Behaviors.stopped
+            case _ =>
+                Behaviors.same
         }
     }
 

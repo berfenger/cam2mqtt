@@ -2,7 +2,6 @@ package net.bfgnet.cam2mqtt.onvif
 
 import java.text.SimpleDateFormat
 import java.time.ZoneId
-import java.util.TimeZone
 
 import akka.actor.ClassicActorSystemProvider
 import net.bfgnet.cam2mqtt.onvif.OnvifSubscriptionRequests.SubscriptionInfo
@@ -23,8 +22,11 @@ trait OnvifPullPointSubscriptionRequests extends OnvifRequest with OnvifAuth {
                 .replace("{Security}", sign.appliedToXML())
                 .replace("{InitialTerminationTime}", s"PT${timeSeconds}S")
 
+        val prevTime = System.currentTimeMillis()
+
         req(host, port, xml, List("action" -> OnvifPullPointSubscriptionTemplates.CREATE_PPA_ACTION))
                 .map(parseCreatePPSResponse)
+                .map(OnvifSubscriptionRequests.applySubscriptionTerminationTimeWorkaround(prevTime, timeSeconds * 1000))
     }
 
     def pullMessagesFromSubscription(host: String, port: Int,

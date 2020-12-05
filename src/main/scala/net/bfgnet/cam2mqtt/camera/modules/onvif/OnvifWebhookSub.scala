@@ -68,14 +68,21 @@ object OnvifWebhookSub extends ActorContextImplicits {
                     // send camera event to parent
                     ev.map(e => CameraModuleEvent(info.cameraId, OnvifModule.moduleId, e)).foreach(parent ! _)
                     Behaviors.same
-                case Unsubscribed =>
-                    Behaviors.stopped
                 case TerminateSubscription =>
                     // cleanup resources on device
                     val f = OnvifRequests.unsubscribe(info.host, info.port, info.username, info.password, subscription.address)
                     context.pipeToSelf(f)(_ => Unsubscribed)
-                    Behaviors.same
+                    finishing()
             }
+        }
+    }
+
+    private def finishing(): Behavior[OnvifSubCmd] = {
+        Behaviors.receiveMessagePartial[OnvifSubCmd] {
+            case Unsubscribed =>
+                Behaviors.stopped
+            case _ =>
+                Behaviors.same
         }
     }
 

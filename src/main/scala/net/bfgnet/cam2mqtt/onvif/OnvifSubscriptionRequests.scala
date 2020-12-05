@@ -23,8 +23,11 @@ trait OnvifSubscriptionRequests extends OnvifRequest with OnvifAuth {
                 .replace("{Address}", callbackAddress)
                 .replace("{InitialTerminationTime}", s"PT${timeSeconds}S")
 
+        val prevTime = System.currentTimeMillis()
+
         req(host, port, xml, List("action" -> OnvifSubscriptionTemplates.SUBSCRIBE_ACTION))
                 .map(parseSubscriptionResponse)
+                .map(OnvifSubscriptionRequests.applySubscriptionTerminationTimeWorkaround(prevTime, timeSeconds * 1000))
     }
 
     def renewSubscription(host: String, port: Int,
@@ -39,15 +42,10 @@ trait OnvifSubscriptionRequests extends OnvifRequest with OnvifAuth {
 
         val prevTime = System.currentTimeMillis()
 
-        req(host, port, xml, List("action" -> OnvifSubscriptionTemplates.RENEW_SUBS_ACTION)).map { xml =>
-            val time = parseRenewSubscriptionResponse(xml)
-            val ftime = if (time < System.currentTimeMillis()) {
-                // workaround: some cameras (reolink) have a bug that causes terminationTime to not be updated
-                // we need to reduce time by 10 seconds as some cameras don't respect the 10 seconds specified on onvif
-                prevTime + (timeSeconds * 1000) - 10000
-            } else time
-            SubscriptionInfo(subscriptionAddress, ftime, isPullPointSub = isPullPointSub)
-        }
+        req(host, port, xml, List("action" -> OnvifSubscriptionTemplates.RENEW_SUBS_ACTION))
+                .map(parseRenewSubscriptionResponse)
+                .map(SubscriptionInfo(subscriptionAddress, _, isPullPointSub = isPullPointSub))
+                .map(OnvifSubscriptionRequests.applySubscriptionTerminationTimeWorkaround(prevTime, timeSeconds * 1000))
     }
 
     def unsubscribe(host: String, port: Int,
@@ -106,6 +104,15 @@ object OnvifSubscriptionRequests {
 
     case class SubscriptionInfo(address: String, terminationTime: Long, isPullPointSub: Boolean)
 
+    private val GRACE_TIME_MILLIS = 10000
+
+    def applySubscriptionTerminationTimeWorkaround(prevTime: Long, subsMillis: Long)(sub: SubscriptionInfo): SubscriptionInfo = {
+        // workaround: some cameras (reolink) have a bug that causes terminationTime to not be updated
+        // we need to reduce time by 10 seconds as some cameras don't respect the 10 seconds specified on onvif
+        if (sub.terminationTime < System.currentTimeMillis() || sub.terminationTime > prevTime + subsMillis - GRACE_TIME_MILLIS) {
+            sub.copy(terminationTime = prevTime + subsMillis - GRACE_TIME_MILLIS)
+        } else sub
+    }
 }
 
 private object OnvifSubscriptionTemplates {
