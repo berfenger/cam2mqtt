@@ -47,12 +47,12 @@ object OnvifPullPointSub extends ActorContextImplicits {
 
     private def subscribed(parent: ActorRef[CameraCmd], info: CameraInfo, subscription: SubscriptionInfo): Behavior[OnvifSubCmd] = {
         Behaviors.setup { implicit context =>
-            context.log.debug(s"pullpoint subscription renewed: millis remaining until next renew = ${subscription.terminationTime - System.currentTimeMillis()}")
-            val timeToRenew = subscription.terminationTime - System.currentTimeMillis() - 15
-            // TODO: cancel this if actor dies. lo mismo en la subscripcion webhook
+            val timeToRenew = subscription.terminationTime - System.currentTimeMillis()
+            context.log.debug(s"pullpoint subscription renewed: millis remaining until next renew = $timeToRenew")
             val renewEv = context.scheduleOnce(timeToRenew.millis, context.self, RenewSubscription)
             Behaviors.receiveMessagePartial[OnvifSubCmd] {
                 case RenewSubscription =>
+                    renewEv.cancel()
                     context.log.debug(s"Renew subscription")
                     val subs = OnvifRequests.renewSubscription(info.host, info.port, info.username, info.password, subscription.address, 60, subscription.isPullPointSub)
                     context.pipeToSelf(subs) {

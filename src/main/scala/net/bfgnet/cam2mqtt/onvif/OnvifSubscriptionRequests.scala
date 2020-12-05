@@ -37,11 +37,14 @@ trait OnvifSubscriptionRequests extends OnvifRequest with OnvifAuth {
                 .replace("{To}", subscriptionAddress)
                 .replace("{TerminationTime}", s"PT${timeSeconds}S")
 
+        val prevTime = System.currentTimeMillis()
+
         req(host, port, xml, List("action" -> OnvifSubscriptionTemplates.RENEW_SUBS_ACTION)).map { xml =>
             val time = parseRenewSubscriptionResponse(xml)
             val ftime = if (time < System.currentTimeMillis()) {
                 // workaround: some cameras (reolink) have a bug that causes terminationTime to not be updated
-                System.currentTimeMillis() + (timeSeconds * 1000) - 2000
+                // we need to reduce time by 10 seconds as some cameras don't respect the 10 seconds specified on onvif
+                prevTime + (timeSeconds * 1000) - 10000
             } else time
             SubscriptionInfo(subscriptionAddress, ftime, isPullPointSub = isPullPointSub)
         }
