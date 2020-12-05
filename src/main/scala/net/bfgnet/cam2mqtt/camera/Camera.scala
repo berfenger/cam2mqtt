@@ -7,6 +7,7 @@ import akka.actor.typed._
 import net.bfgnet.cam2mqtt.camera.CameraConfig.CameraInfo
 import net.bfgnet.cam2mqtt.camera.CameraProtocol._
 import net.bfgnet.cam2mqtt.camera.modules.CameraModules
+import net.bfgnet.cam2mqtt.camera.modules.onvif.OnvifModule
 import net.bfgnet.cam2mqtt.eventbus.CameraEventBus
 
 import scala.concurrent.duration._
@@ -58,6 +59,10 @@ object Camera {
                 CameraEventBus.bus.publish(ev)
                 Behaviors.same
             case TerminateCam =>
+                // if motion, publish default state
+                if (motion) {
+                    CameraEventBus.bus.publish(CameraMotionEvent(info.cameraId, OnvifModule.moduleId, motion = false))
+                }
                 // Stop children modules
                 modules.values.foreach(_ ! TerminateCam)
                 finishing(info.cameraId, modules.values.toList)

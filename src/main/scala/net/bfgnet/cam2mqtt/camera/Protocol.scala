@@ -90,16 +90,28 @@ object CameraConfig {
 
     trait CameraModuleConfig {
         val moduleId: String
+        type ModConf <: CameraModuleConfig
+        def copyWithPrivacy(): ModConf
     }
 
-    case class CameraInfo(cameraId: String, host: String, port: Int, username: String, password: String, modules: List[CameraModuleConfig])
+    case class CameraInfo(cameraId: String, host: String, port: Int, username: String, password: String, modules: List[CameraModuleConfig]) {
+        def copyWithPrivacy(): CameraInfo = this.copy(password = "redacted", modules = modules.map(_.copyWithPrivacy()))
+    }
 
     case class OnvifCameraModuleConfig(monitorEvents: Boolean, preferWebhookSub: Boolean) extends CameraModuleConfig {
         override val moduleId: String = OnvifModule.moduleId
+
+        override type ModConf = OnvifCameraModuleConfig
+
+        override def copyWithPrivacy(): OnvifCameraModuleConfig = this
     }
 
     case class ReolinkCameraModuleConfig(port: Option[Int], useSSL: Option[Boolean], altUsername: Option[String], altPassword: Option[String], syncDateTime: Boolean) extends CameraModuleConfig {
         override val moduleId: String = ReolinkModule.moduleId
+
+        override type ModConf = ReolinkCameraModuleConfig
+
+        override def copyWithPrivacy(): ReolinkCameraModuleConfig = this.copy(altPassword = this.altPassword.map(_ => "redacted"))
     }
 
 }

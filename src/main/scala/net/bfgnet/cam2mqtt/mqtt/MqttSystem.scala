@@ -159,6 +159,8 @@ object MqttSystem extends ActorContextImplicits {
                     terminatingOk()
                 case TerminatedWithError(_) =>
                     Behaviors.stopped
+                case _ =>
+                    Behaviors.same
             }
         }
 
@@ -168,6 +170,8 @@ object MqttSystem extends ActorContextImplicits {
                 Behaviors.stopped
             case TerminatedWithError(_) =>
                 Behaviors.stopped
+            case _ =>
+                Behaviors.same
         }
 
     private def failing(): Behavior[MqttCmd] =
@@ -176,6 +180,8 @@ object MqttSystem extends ActorContextImplicits {
                 throw new Exception("stream failed")
             case TerminatedWithError(err) =>
                 throw err
+            case _ =>
+                Behaviors.same
         }
 
     private def connectionSettings(cfg: MqttConfig): MqttConnectionSettings = {

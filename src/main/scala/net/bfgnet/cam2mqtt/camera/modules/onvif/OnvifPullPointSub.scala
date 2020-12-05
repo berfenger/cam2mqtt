@@ -25,7 +25,7 @@ object OnvifPullPointSub extends ActorContextImplicits {
             context.setLoggerName(OnvifPullPointSub.getClass)
 
             // create subscription on start
-            context.log.debug(s"starting pullpoint subscription on device ${info}")
+            context.log.debug(s"starting pullpoint subscription on device ${info.copyWithPrivacy()}")
             val subs = OnvifRequests.createPullPointSubscription(info.host, info.port, info.username, info.password, 60)
             context.pipeToSelf(subs) {
                 case Success(value) => Subscribed(value)

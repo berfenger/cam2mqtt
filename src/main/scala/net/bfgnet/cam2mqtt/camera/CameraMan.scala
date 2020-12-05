@@ -26,7 +26,7 @@ object CameraMan {
 
             Behaviors.receiveMessagePartial {
                 case InitCam(cam) =>
-                    context.log.info(s"Starting cam $cam")
+                    context.log.info(s"Starting cam ${cam.copyWithPrivacy()}")
                     if (!monitored.contains(cam.cameraId)) {
                         val ref = context.spawn(Camera(cam), s"cam_${cam.cameraId}")
                         context.watch(ref)

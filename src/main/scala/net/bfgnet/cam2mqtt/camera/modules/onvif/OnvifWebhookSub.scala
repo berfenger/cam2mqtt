@@ -22,7 +22,7 @@ object OnvifWebhookSub extends ActorContextImplicits {
     private def stopped(parent: ActorRef[CameraCmd], webhookConfig: WebhookConfig, info: CameraInfo): Behavior[OnvifSubCmd] = {
         Behaviors.setup { implicit context =>
             // create subscription on start
-            context.log.debug(s"starting webhook subscription on device ${info}")
+            context.log.debug(s"starting webhook subscription on device ${info.copyWithPrivacy()}")
             val webhookUrl = concatUrl(webhookConfig.external_url, s"onvif/webhook/camera/${info.cameraId}")
             val subs = OnvifRequests.subscribe(info.host, info.port, info.username, info.password, webhookUrl, 60)
             context.pipeToSelf(subs) {
