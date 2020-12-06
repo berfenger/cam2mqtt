@@ -14,7 +14,7 @@ object GenericMqttCamModule extends MqttCameraModule {
     override def eventToMqttMessage(ev: CameraProtocol.CameraEvent): Option[MqttMessage] = ev match {
         case CameraAvailableEvent(cameraId, available) =>
             val value = if (available) "online" else "offline"
-            Some(MqttMessage(s"${cameraPath(cameraId)}/status", ByteString(value)))
+            Some(MqttMessage(s"${cameraPath(cameraId)}/status", ByteString(value)).withRetained(true))
         case _ => None
     }
 }
