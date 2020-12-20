@@ -43,6 +43,33 @@ For now only two modules are implemented:
 
 Feel free to try other cameras and let me know if it works so I can update this list.
 
+## MQTT Protocol
+
+##### Camera availability
+    cam2mqtt/camera/{cameraId}/status online/offline
+
+#### Onvif module
+
+##### Motion events
+    cam2mqtt/camera/{cameraId}/event/onvif/motion on/off
+
+#### Reolink module
+
+##### States
+    cam2mqtt/camera/{cameraId}/state/reolink/nightvision auto/on/off
+    cam2mqtt/camera/{cameraId}/state/reolink/irlights on/off
+    cam2mqtt/camera/{cameraId}/state/reolink/ftp on/off
+    cam2mqtt/camera/{cameraId}/state/reolink/motion/sensitivity 0-100
+    cam2mqtt/camera/{cameraId}/state/reolink/ptz/zoom/absolute 0-100
+
+##### Commands
+    cam2mqtt/camera/{cameraId}/command/reolink/nightvision auto/on/off
+    cam2mqtt/camera/{cameraId}/command/reolink/irlights on/off
+    cam2mqtt/camera/{cameraId}/command/reolink/ftp on/off
+    cam2mqtt/camera/{cameraId}/command/reolink/motion/sensitivity 0-100
+    cam2mqtt/camera/{cameraId}/command/reolink/ptz/zoom/absolute 0-100
+    
+
 ## Licensing
 Copyright 2020 Arturo Casal
 

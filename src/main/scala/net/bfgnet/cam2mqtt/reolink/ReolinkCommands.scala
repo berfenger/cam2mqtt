@@ -40,6 +40,19 @@ case class SetAlarmCommandParams(channel: Int, `type`: String, sens: List[AlarmS
 
 case class SetAlarmCommand(Alarm: SetAlarmCommandParams) extends CommandParams
 
+case class ScheduleTable(enable: Int, table: String) {
+    def enabled(): ScheduleTable = this.copy(enable = 1)
+    def disabled(): ScheduleTable = this.copy(enable = 0)
+    def enabled(isEnabled: Boolean): ScheduleTable = if (isEnabled) enabled() else disabled()
+    def withFullMotion(): ScheduleTable = this.copy(table = (0 until 168).map(_ => "1").mkString)
+    def withNoMotion(): ScheduleTable = this.copy(table = (0 until 168).map(_ => "0").mkString)
+}
+
+@JsonIgnoreProperties(ignoreUnknown = true)
+case class SetFtpCommandParams(schedule: ScheduleTable)
+
+case class SetFtpCommand(Ftp: SetFtpCommandParams) extends CommandParams
+
 case class Channel(channel: Int) extends CommandParams
 
 case class ReolinkCmd(cmd: String, action: Int, param: CommandParams)
@@ -189,6 +202,15 @@ trait ReolinkCommands extends ReolinkRequest {
             val updParams = params.copy(sens = params.sens.map(_.copy(sensitivity = invertedSens)))
             val cmd = ReolinkCmd("SetAlarm", 1, SetAlarmCommand(updParams))
             runCommand(host, cmd)
+        }
+    }
+
+    def setFTPEnabled(host: ReolinkHost, enabled: Boolean)
+                    (implicit _as: ClassicActorSystemProvider, _ec: ExecutionContext): Future[ReolinkCmdResponse] = {
+        val sched = ScheduleTable(-1, null).enabled(enabled).withFullMotion()
+        val cmd = ReolinkCmd("SetFtp", 0, SetFtpCommand(SetFtpCommandParams(sched)))
+        reqPost(host, Option(cmd.cmd), OM.writeValueAsString(List(cmd))).map {
+            r => parseCommandResponse(r)
         }
     }
 

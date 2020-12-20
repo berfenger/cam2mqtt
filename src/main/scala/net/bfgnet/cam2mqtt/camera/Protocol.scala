@@ -84,6 +84,8 @@ object CameraActionProtocol {
     // Motion sensitivity
     case class SetMotionSensActionRequest(sens: Int, override val replyTo: Option[ActorRef[CameraActionResponse]]) extends CameraActionRequest
 
+    case class SetFTPEnabledActionRequest(enabled: Boolean, override val replyTo: Option[ActorRef[CameraActionResponse]]) extends CameraActionRequest
+
 }
 
 object CameraConfig {

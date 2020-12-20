@@ -16,6 +16,7 @@ trait ReolinkCapabilityRequest extends ReolinkRequest {
             ReolinkCmd("GetIrLights", 1, null),
             ReolinkCmd("GetIsp", 1, Channel(0)),
             ReolinkCmd("GetZoomFocus", 1, Channel(0)),
+            ReolinkCmd("GetFtp", 0, Channel(0)),
             ReolinkCmd("GetAlarm", 1, GetAlarmCommand(GetAlarmCommandParams(0, "md")))
         )
         for {
@@ -47,6 +48,7 @@ trait ReolinkCapabilityRequest extends ReolinkRequest {
             case "GetIrLights" => Try(parseGetIrLights(caps, state, result)).toOption.getOrElse((caps, state))
             case "GetZoomFocus" => Try(parseGetZoomFocus(caps, state, result)).toOption.getOrElse((caps, state))
             case "GetAlarm" => Try(parseGetAlarm(caps, state, result)).toOption.getOrElse((caps, state))
+            case "GetFtp" => Try(parseGetFtp(caps, state, result)).toOption.getOrElse((caps, state))
             case _ => (caps, state)
         }
     }
@@ -109,6 +111,16 @@ trait ReolinkCapabilityRequest extends ReolinkRequest {
                 // transform sensitivity scale from [50, 1] to [0, 100]
                 val nv = first.map(_.sensitivity).map(_ - 1).map(_.toFloat / 49.0f * 100.0f).map(scala.math.round).map(100 - _)
                 (caps.copy(motionSens = true), state.copy(motionSens = nv))
+        }
+    }
+
+    private def parseGetFtp(caps: ReolinkCapabilities, state: ReolinkState, result: Either[ReolinkCmdResponseError, JSONObject]): (ReolinkCapabilities, ReolinkState) = {
+        result match {
+            case Left(_) => (caps, state)
+            case Right(json) =>
+                val ftp = json.getJSONObject("Ftp")
+                val params = OM.readValue(ftp.toString, classOf[SetFtpCommandParams])
+                (caps.copy(ftp = true), state.copy(ftp = Option(params.schedule.enable == 1)))
         }
     }
 
