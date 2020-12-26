@@ -81,10 +81,12 @@ object CameraActionProtocol {
 
     case class SetIrLightsActionRequest(enabled: Boolean, override val replyTo: Option[ActorRef[CameraActionResponse]]) extends CameraActionRequest
 
-    // Motion sensitivity
+    // Motion record
     case class SetMotionSensActionRequest(sens: Int, override val replyTo: Option[ActorRef[CameraActionResponse]]) extends CameraActionRequest
 
     case class SetFTPEnabledActionRequest(enabled: Boolean, override val replyTo: Option[ActorRef[CameraActionResponse]]) extends CameraActionRequest
+
+    case class SetRecordEnabledActionRequest(enabled: Boolean, override val replyTo: Option[ActorRef[CameraActionResponse]]) extends CameraActionRequest
 
 }
 

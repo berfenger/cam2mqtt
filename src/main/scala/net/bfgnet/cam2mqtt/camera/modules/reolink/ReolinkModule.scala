@@ -17,14 +17,16 @@ import scala.util.{Failure, Success, Try}
 sealed trait ReolinkResponse
 
 object ReolinkCapabilities {
-    def defaultCapabilities: ReolinkCapabilities = ReolinkCapabilities(nightVision = false, irlights = false, motionSens = false, ftp = false, ptzZoom = false)
+    def defaultCapabilities: ReolinkCapabilities = ReolinkCapabilities(nightVision = false, irlights = false,
+        motionSens = false, ftp = false, record = false, ptzZoom = false)
 
-    def defaultState: ReolinkState = ReolinkState(None, None, None, None, None)
+    def defaultState: ReolinkState = ReolinkState(None, None, None, None, None, None)
 }
 
-case class ReolinkCapabilities(nightVision: Boolean, irlights: Boolean, motionSens: Boolean, ftp: Boolean, ptzZoom: Boolean)
+case class ReolinkCapabilities(nightVision: Boolean, irlights: Boolean, motionSens: Boolean, ftp: Boolean, record: Boolean, ptzZoom: Boolean)
 
-case class ReolinkState(nightVision: Option[NightVisionMode.Value], irlights: Option[Boolean], motionSens: Option[Int], ftp: Option[Boolean], zoomAbsLevel: Option[Int])
+case class ReolinkState(nightVision: Option[NightVisionMode.Value], irlights: Option[Boolean], motionSens: Option[Int],
+                        ftp: Option[Boolean], record: Option[Boolean], zoomAbsLevel: Option[Int])
 
 case class ReolinkInitialState(caps: ReolinkCapabilities, state: ReolinkState)
 
@@ -37,9 +39,10 @@ object ReolinkModule extends CameraModule with MqttCameraModule with ActorContex
     private val CAM_PARAM_IRLIGHTS = "irlights"
     private val CAM_PARAM_MOTION_SENS = "motion/sensitivity"
     private val CAM_PARAM_FTP = "ftp"
+    private val CAM_PARAM_RECORD = "record"
     private val CAM_PARAM_ZOOM_ABS = "ptz/zoom/absolute"
 
-    private val CAM_PARAMS = List(CAM_PARAM_NIGHTVISION, CAM_PARAM_IRLIGHTS, CAM_PARAM_MOTION_SENS, CAM_PARAM_FTP, CAM_PARAM_ZOOM_ABS)
+    private val CAM_PARAMS = List(CAM_PARAM_NIGHTVISION, CAM_PARAM_IRLIGHTS, CAM_PARAM_MOTION_SENS, CAM_PARAM_FTP, CAM_PARAM_RECORD, CAM_PARAM_ZOOM_ABS)
 
     private val NIGHVISION_VALUES = List("on", "off", "auto")
 
@@ -137,6 +140,11 @@ object ReolinkModule extends CameraModule with MqttCameraModule with ActorContex
                             updateFTPState(setup)
                         }
                     }
+                    if (cmd.caps.record) {
+                        cmd.state.record.foreach {
+                            updateRecordState(setup)
+                        }
+                    }
                     awaitingCommand(setup, cmd.caps)
                 case TerminateCam =>
                     Behaviors.stopped
@@ -171,8 +179,12 @@ object ReolinkModule extends CameraModule with MqttCameraModule with ActorContex
                     val a = ReolinkRequests.setAlarmSens(setup.host, mode)
                     context.pipeToSelf(a)(wrapGenericResponse(req))
                     awaitingCommandResult(setup, caps, replyTo)
-                case CameraModuleAction(_, _, req@SetFTPEnabledActionRequest(mode, replyTo)) if caps.motionSens =>
+                case CameraModuleAction(_, _, req@SetFTPEnabledActionRequest(mode, replyTo)) if caps.ftp =>
                     val a = ReolinkRequests.setFTPEnabled(setup.host, mode)
+                    context.pipeToSelf(a)(wrapGenericResponse(req))
+                    awaitingCommandResult(setup, caps, replyTo)
+                case CameraModuleAction(_, _, req@SetRecordEnabledActionRequest(mode, replyTo)) if caps.record =>
+                    val a = ReolinkRequests.setRecordEnabled(setup.host, mode)
                     context.pipeToSelf(a)(wrapGenericResponse(req))
                     awaitingCommandResult(setup, caps, replyTo)
                 case CameraModuleAction(_, _, req) =>
@@ -204,6 +216,8 @@ object ReolinkModule extends CameraModule with MqttCameraModule with ActorContex
                                 updateZoomState(setup)(zoomLevel.z)
                             case SetFTPEnabledActionRequest(enabled, _) =>
                                 updateFTPState(setup)(enabled)
+                            case SetRecordEnabledActionRequest(enabled, _) =>
+                                updateRecordState(setup)(enabled)
                             case _ =>
                         }
                     }
@@ -261,6 +275,12 @@ object ReolinkModule extends CameraModule with MqttCameraModule with ActorContex
                     case "off" => false
                 }
                 Some(SetFTPEnabledActionRequest(nv, None))
+            case "record" :: Nil if ONOFF_VALUES.contains(stringData) =>
+                val nv = stringData match {
+                    case "on" => true
+                    case "off" => false
+                }
+                Some(SetRecordEnabledActionRequest(nv, None))
             case "ptz" :: "zoom" :: "absolute" :: Nil =>
                 val zoomLevel = Try(stringData.toInt).toOption
                 zoomLevel.map { zl =>
@@ -304,5 +324,9 @@ object ReolinkModule extends CameraModule with MqttCameraModule with ActorContex
 
     private def updateFTPState(setup: Setup)(enabled: Boolean): Unit  = {
         setup.parent ! CameraModuleEvent(setup.camera.cameraId, moduleId, CameraStateBoolEvent(setup.camera.cameraId, moduleId, CAM_PARAM_FTP, enabled))
+    }
+
+    private def updateRecordState(setup: Setup)(enabled: Boolean): Unit  = {
+        setup.parent ! CameraModuleEvent(setup.camera.cameraId, moduleId, CameraStateBoolEvent(setup.camera.cameraId, moduleId, CAM_PARAM_RECORD, enabled))
     }
 }

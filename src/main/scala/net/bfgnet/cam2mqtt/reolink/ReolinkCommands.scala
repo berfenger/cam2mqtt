@@ -53,6 +53,11 @@ case class SetFtpCommandParams(schedule: ScheduleTable)
 
 case class SetFtpCommand(Ftp: SetFtpCommandParams) extends CommandParams
 
+@JsonIgnoreProperties(ignoreUnknown = true)
+case class SetRecCommandParams(schedule: ScheduleTable)
+
+case class SetRecCommand(Rec: SetRecCommandParams) extends CommandParams
+
 case class Channel(channel: Int) extends CommandParams
 
 case class ReolinkCmd(cmd: String, action: Int, param: CommandParams)
@@ -209,6 +214,15 @@ trait ReolinkCommands extends ReolinkRequest {
                     (implicit _as: ClassicActorSystemProvider, _ec: ExecutionContext): Future[ReolinkCmdResponse] = {
         val sched = ScheduleTable(-1, null).enabled(enabled).withFullMotion()
         val cmd = ReolinkCmd("SetFtp", 0, SetFtpCommand(SetFtpCommandParams(sched)))
+        reqPost(host, Option(cmd.cmd), OM.writeValueAsString(List(cmd))).map {
+            r => parseCommandResponse(r)
+        }
+    }
+
+    def setRecordEnabled(host: ReolinkHost, enabled: Boolean)
+                     (implicit _as: ClassicActorSystemProvider, _ec: ExecutionContext): Future[ReolinkCmdResponse] = {
+        val sched = ScheduleTable(-1, null).enabled(enabled).withFullMotion()
+        val cmd = ReolinkCmd("SetRec", 0, SetRecCommand(SetRecCommandParams(sched)))
         reqPost(host, Option(cmd.cmd), OM.writeValueAsString(List(cmd))).map {
             r => parseCommandResponse(r)
         }
