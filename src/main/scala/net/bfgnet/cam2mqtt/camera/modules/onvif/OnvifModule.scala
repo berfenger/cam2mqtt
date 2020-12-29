@@ -51,15 +51,16 @@ object OnvifModule extends CameraModule with MqttCameraModule with ActorContextI
                         context.watch(a)
                         a
                     }
-                    started(parent, camera, subActor)
+                    started(parent, subActor)
                 case WrappedModuleCmd(OnvifError(err)) =>
                     throw err
+                case TerminateCam =>
+                    Behaviors.stopped
             }
         }
     }
 
     private def started(parent: ActorRef[CameraCmd],
-                        camera: CameraInfo,
                         subscriptionActor: Option[ActorRef[OnvifSubCmd]]): Behavior[CameraCmd] = {
         Behaviors.setup[CameraCmd] { implicit context =>
 
@@ -83,8 +84,8 @@ object OnvifModule extends CameraModule with MqttCameraModule with ActorContextI
                             Behaviors.stopped
                     }
             }.receiveSignal {
-                case (_, Terminated(value)) =>
-                    throw new Exception("my son failed")
+                case (_, Terminated(actor)) =>
+                    throw new Exception(s"subscription actor [$actor] failed")
                 case (_, PostStop) =>
                     Behaviors.same
             }
@@ -121,6 +122,6 @@ object OnvifModule extends CameraModule with MqttCameraModule with ActorContextI
         case CameraMotionEvent(cameraId, moduleId, motion) =>
             val value = if (motion) "on" else "off"
             Some(MqttMessage(s"${cameraEventModulePath(cameraId, moduleId)}/motion", ByteString(value)))
-        case e => None
+        case _ => None
     }
 }
