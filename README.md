@@ -38,7 +38,7 @@ For now only two modules are implemented:
 ## Hardware Compatibility
 * Reolink RLC-520
 * Reolink RLC-511w
-* Reolink RLC-811A (tested by @luckfamousa)
+* Reolink RLC-811A
 * Other Reolink ONVIF cameras should work.
 * Any other IP camera supporting ONVIF event subscriptions (webhook or pullpoint-subscription based) should work.
 
