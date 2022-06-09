@@ -40,6 +40,7 @@ case class SetAlarmCommandParams(channel: Int, `type`: String, sens: List[AlarmS
 
 case class SetAlarmCommand(Alarm: SetAlarmCommandParams) extends CommandParams
 
+// V10 ScheduleTable
 case class ScheduleTable(enable: Int, table: String) {
     def enabled(): ScheduleTable = this.copy(enable = 1)
     def disabled(): ScheduleTable = this.copy(enable = 0)
@@ -47,17 +48,44 @@ case class ScheduleTable(enable: Int, table: String) {
     def withFullMotion(): ScheduleTable = this.copy(table = (0 until 168).map(_ => "1").mkString)
     def withNoMotion(): ScheduleTable = this.copy(table = (0 until 168).map(_ => "0").mkString)
 }
-
+// SetFtp
 @JsonIgnoreProperties(ignoreUnknown = true)
 case class SetFtpCommandParams(schedule: ScheduleTable)
 
 case class SetFtpCommand(Ftp: SetFtpCommandParams) extends CommandParams
 
+// SetFtpV20
+@JsonIgnoreProperties(ignoreUnknown = true)
+case class SetFtpV20CommandParams(enable: Int)
+
+case class SetFtpV20Command(Ftp: SetFtpV20CommandParams) extends CommandParams
+
+// SetRec
 @JsonIgnoreProperties(ignoreUnknown = true)
 case class SetRecCommandParams(schedule: ScheduleTable)
 
 case class SetRecCommand(Rec: SetRecCommandParams) extends CommandParams
 
+// SetRecV20
+@JsonIgnoreProperties(ignoreUnknown = true)
+case class SetRecV20CommandParams(enable: Int)
+
+case class SetRecV20Command(Rec: SetRecV20CommandParams) extends CommandParams
+
+// GetAiState
+@JsonIgnoreProperties(ignoreUnknown = true)
+case class GetAiObjectState(alarm_state: Int, support: Int) {
+    def isSupported = support == 1
+    def isDetected = alarm_state == 1
+}
+
+@JsonIgnoreProperties(ignoreUnknown = true)
+case class GetAiStateParams(channel: Int, dog_cat: GetAiObjectState, face: GetAiObjectState, people: GetAiObjectState, vehicle: GetAiObjectState)
+
+@JsonIgnoreProperties(ignoreUnknown = true)
+case class GetAiStateCmdResponse(cmd: String, code: Int, value: GetAiStateParams)
+
+// Common
 case class Channel(channel: Int) extends CommandParams
 
 case class ReolinkCmd(cmd: String, action: Int, param: CommandParams)
@@ -219,12 +247,37 @@ trait ReolinkCommands extends ReolinkRequest {
         }
     }
 
+    def setFTPV20Enabled(host: ReolinkHost, enabled: Boolean)
+                     (implicit _as: ClassicActorSystemProvider, _ec: ExecutionContext): Future[ReolinkCmdResponse] = {
+        val cmd = ReolinkCmd("SetFtpV20", 0, SetFtpV20Command(SetFtpV20CommandParams(if (enabled) 1 else 0)))
+        reqPost(host, Option(cmd.cmd), OM.writeValueAsString(List(cmd))).map {
+            r => parseCommandResponse(r)
+        }
+    }
+
     def setRecordEnabled(host: ReolinkHost, enabled: Boolean)
                      (implicit _as: ClassicActorSystemProvider, _ec: ExecutionContext): Future[ReolinkCmdResponse] = {
         val sched = ScheduleTable(-1, null).enabled(enabled).withFullMotion()
         val cmd = ReolinkCmd("SetRec", 0, SetRecCommand(SetRecCommandParams(sched)))
         reqPost(host, Option(cmd.cmd), OM.writeValueAsString(List(cmd))).map {
             r => parseCommandResponse(r)
+        }
+    }
+
+    def setRecordV20Enabled(host: ReolinkHost, enabled: Boolean)
+                        (implicit _as: ClassicActorSystemProvider, _ec: ExecutionContext): Future[ReolinkCmdResponse] = {
+        val cmd = ReolinkCmd("SetRecV20", 0, SetRecV20Command(SetRecV20CommandParams(if (enabled) 1 else 0)))
+        reqPost(host, Option(cmd.cmd), OM.writeValueAsString(List(cmd))).map {
+            r => parseCommandResponse(r)
+        }
+    }
+
+    def getAiState(host: ReolinkHost)
+               (implicit _as: ClassicActorSystemProvider, _ec: ExecutionContext): Future[Option[GetAiStateCmdResponse]] = {
+        val cmd = ReolinkCmd("GetAiState", 0, Channel(0))
+        reqPost(host, Option(cmd.cmd), OM.writeValueAsString(List(cmd))).map { r =>
+            val resp = OM.readValue(axeArray(r), classOf[GetAiStateCmdResponse])
+            Option(resp).filter(_.code == 0).filter(_.cmd == "GetAiState").filter(_.value != null)
         }
     }
 

@@ -8,6 +8,7 @@ import net.bfgnet.cam2mqtt.camera.CameraConfig.CameraInfo
 import net.bfgnet.cam2mqtt.camera.CameraProtocol._
 import net.bfgnet.cam2mqtt.camera.modules.CameraModules
 import net.bfgnet.cam2mqtt.camera.modules.onvif.OnvifModule
+import net.bfgnet.cam2mqtt.camera.modules.reolink.ReolinkModule
 import net.bfgnet.cam2mqtt.eventbus.CameraEventBus
 
 import scala.concurrent.duration._
@@ -46,6 +47,8 @@ object Camera {
                 // if motion state does not change, discard event
                 if (motion != ev.motion) {
                     CameraEventBus.bus.publish(ev)
+                    // send motion event to Reolink module if available (for AI detection integration)
+                    modules.get(ReolinkModule.moduleId).foreach(_ ! CameraModuleEvent(ev.cameraId, ev.moduleId, ev))
                     routing(info, modules, ev.motion, available)
                 } else Behaviors.same
             case CameraModuleEvent(_, _, ev: CameraAvailableEvent) if available != ev.available =>

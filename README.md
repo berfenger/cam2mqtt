@@ -27,8 +27,15 @@ For now only two modules are implemented:
     * PTZ (absolute zoom)
     * Change night vision mode (auto, on, off)
     * Enable/disable IR lights (auto, off)
-    * Change motion alarm sensitivity
+    * Change motion alarm sensitivity (old API)
     * Sync date time
+    * Enable/disable Record (V1 & V2)
+    * Enable/disable FTP (V1 & V2)
+  * AI motion detection
+    * Person detection
+    * Vehicle detection
+    * Pet detection (not yet supported by firmware)
+    * Face detection (not yet supported by firmware)
 
 ## Requirements
 * Docker (if you want painless deployment)
@@ -39,6 +46,7 @@ For now only two modules are implemented:
 * Reolink RLC-520
 * Reolink RLC-511w
 * Reolink RLC-811A
+* Reolink RLC-520A (incl. people and vehicle AI detection)
 * Other Reolink ONVIF cameras should work.
 * Any other IP camera supporting ONVIF event subscriptions (webhook or pullpoint-subscription based) should work.
 
@@ -59,9 +67,10 @@ Feel free to try other cameras and let me know if it works so I can update this 
 ##### States
     cam2mqtt/camera/{cameraId}/state/reolink/nightvision auto/on/off
     cam2mqtt/camera/{cameraId}/state/reolink/irlights on/off
-    cam2mqtt/camera/{cameraId}/state/reolink/ftp on/off
     cam2mqtt/camera/{cameraId}/state/reolink/motion/sensitivity 0-100
     cam2mqtt/camera/{cameraId}/state/reolink/ptz/zoom/absolute 0-100
+    cam2mqtt/camera/{cameraId}/state/reolink/record on/off
+    cam2mqtt/camera/{cameraId}/state/reolink/ftp on/off
 
 ##### Commands
     cam2mqtt/camera/{cameraId}/command/reolink/nightvision auto/on/off
@@ -69,10 +78,17 @@ Feel free to try other cameras and let me know if it works so I can update this 
     cam2mqtt/camera/{cameraId}/command/reolink/ftp on/off
     cam2mqtt/camera/{cameraId}/command/reolink/motion/sensitivity 0-100
     cam2mqtt/camera/{cameraId}/command/reolink/ptz/zoom/absolute 0-100
-    
+    cam2mqtt/camera/{cameraId}/command/reolink/record on/off
+    cam2mqtt/camera/{cameraId}/command/reolink/ftp on/off
+
+##### Motion events (AI detection)
+    cam2mqtt/camera/{cameraId}/event/reolink/aidetection/people/detected on/off
+    cam2mqtt/camera/{cameraId}/event/reolink/aidetection/vehicle/detected on/off
+    cam2mqtt/camera/{cameraId}/event/reolink/aidetection/pet/detected on/off
+    cam2mqtt/camera/{cameraId}/event/reolink/aidetection/face/detected on/off
 
 ## Licensing
-Copyright 2020 Arturo Casal
+Copyright 2022 Arturo Casal
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.

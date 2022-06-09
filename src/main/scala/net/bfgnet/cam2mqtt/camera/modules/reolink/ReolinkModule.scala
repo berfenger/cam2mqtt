@@ -7,9 +7,10 @@ import akka.util.ByteString
 import net.bfgnet.cam2mqtt.camera.CameraActionProtocol._
 import net.bfgnet.cam2mqtt.camera.CameraConfig.{CameraInfo, CameraModuleConfig, ReolinkCameraModuleConfig}
 import net.bfgnet.cam2mqtt.camera.CameraProtocol._
+import net.bfgnet.cam2mqtt.camera.modules.reolink.ReolinkAIDetectionTrackingActor.{AITrackerCmd, ReolinkAIMotionDetectionStateUpdate}
 import net.bfgnet.cam2mqtt.camera.modules.{CameraModule, MqttCameraModule}
 import net.bfgnet.cam2mqtt.camera.{CameraActionProtocol, CameraProtocol}
-import net.bfgnet.cam2mqtt.reolink.{ReolinkCmdResponse, ReolinkHost, ReolinkRequests}
+import net.bfgnet.cam2mqtt.reolink.{GetAiStateParams, ReolinkCmdResponse, ReolinkHost, ReolinkRequests}
 import net.bfgnet.cam2mqtt.utils.ActorContextImplicits
 
 import scala.util.{Failure, Success, Try}
@@ -18,15 +19,17 @@ sealed trait ReolinkResponse
 
 object ReolinkCapabilities {
     def defaultCapabilities: ReolinkCapabilities = ReolinkCapabilities(nightVision = false, irlights = false,
-        motionSens = false, ftp = false, record = false, ptzZoom = false)
+        motionSens = false, ftp = false, ftpV20 = false, record = false, recordV20 = false, ptzZoom = false,
+        aiDetection = false)
 
-    def defaultState: ReolinkState = ReolinkState(None, None, None, None, None, None)
+    def defaultState: ReolinkState = ReolinkState(None, None, None, None, None, None, None)
 }
 
-case class ReolinkCapabilities(nightVision: Boolean, irlights: Boolean, motionSens: Boolean, ftp: Boolean, record: Boolean, ptzZoom: Boolean)
+case class ReolinkCapabilities(nightVision: Boolean, irlights: Boolean, motionSens: Boolean, ftp: Boolean,
+                               ftpV20: Boolean, record: Boolean, recordV20: Boolean, ptzZoom: Boolean, aiDetection: Boolean)
 
 case class ReolinkState(nightVision: Option[NightVisionMode.Value], irlights: Option[Boolean], motionSens: Option[Int],
-                        ftp: Option[Boolean], record: Option[Boolean], zoomAbsLevel: Option[Int])
+                        ftp: Option[Boolean], record: Option[Boolean], zoomAbsLevel: Option[Int], aiDetectionState: Option[GetAiStateParams])
 
 case class ReolinkInitialState(caps: ReolinkCapabilities, state: ReolinkState)
 
@@ -41,6 +44,7 @@ object ReolinkModule extends CameraModule with MqttCameraModule with ActorContex
     private val CAM_PARAM_FTP = "ftp"
     private val CAM_PARAM_RECORD = "record"
     private val CAM_PARAM_ZOOM_ABS = "ptz/zoom/absolute"
+    private val CAM_PARAM_AIDETECTION_STATE = "aidetection"
 
     private val CAM_PARAMS = List(CAM_PARAM_NIGHTVISION, CAM_PARAM_IRLIGHTS, CAM_PARAM_MOTION_SENS, CAM_PARAM_FTP, CAM_PARAM_RECORD, CAM_PARAM_ZOOM_ABS)
 
@@ -135,30 +139,30 @@ object ReolinkModule extends CameraModule with MqttCameraModule with ActorContex
                             updateMotionSensState(setup)
                         }
                     }
-                    if (cmd.caps.ftp) {
+                    if (cmd.caps.ftp || cmd.caps.ftpV20) {
                         cmd.state.ftp.foreach {
                             updateFTPState(setup)
                         }
                     }
-                    if (cmd.caps.record) {
+                    if (cmd.caps.record || cmd.caps.recordV20) {
                         cmd.state.record.foreach {
                             updateRecordState(setup)
                         }
                     }
-                    awaitingCommand(setup, cmd.caps)
+                    awaitingCommand(setup, cmd.caps, None)
                 case TerminateCam =>
                     Behaviors.stopped
             }
         }
     }
 
-    private def awaitingCommand(setup: Setup, caps: ReolinkCapabilities): Behavior[CameraCmd] = {
+    private def awaitingCommand(setup: Setup, caps: ReolinkCapabilities, aiDetectionTrackingActor: Option[ActorRef[AITrackerCmd]]): Behavior[CameraCmd] = {
         Behaviors.setup { implicit context =>
             Behaviors.receiveMessagePartial[CameraCmd] {
                 case CameraModuleAction(_, _, req@SetNightVisionActionRequest(mode, replyTo)) if caps.nightVision =>
                     val a = ReolinkRequests.setNightVision(setup.host, mode)
                     context.pipeToSelf(a)(wrapGenericResponse(req))
-                    awaitingCommandResult(setup, caps, replyTo)
+                    awaitingCommandResult(setup, caps, aiDetectionTrackingActor, replyTo)
                 case CameraModuleAction(_, _, req@PTZMoveActionRequest(pt, z, abs, replyTo)) if caps.ptzZoom =>
                     if (pt.isDefined || !abs || z.isEmpty) {
                         replyTo.foreach(_ ! CameraActionResponse(Left(new IllegalArgumentException("only absolute zoom is currently supported"))))
@@ -166,7 +170,7 @@ object ReolinkModule extends CameraModule with MqttCameraModule with ActorContex
                     } else {
                         val a = ReolinkRequests.setZoom(setup.host, z.get.z)
                         context.pipeToSelf(a)(wrapGenericResponse(req))
-                        awaitingCommandResult(setup, caps, replyTo)
+                        awaitingCommandResult(setup, caps, aiDetectionTrackingActor, replyTo)
                     }
                 case CameraModuleAction(_, _, req@PTZMoveActionRequest(_, _, _, replyTo)) if !caps.ptzZoom =>
                     replyTo.foreach(_ ! CameraActionResponse(Left(new IllegalArgumentException("camera does not support PTZ control"))))
@@ -174,21 +178,39 @@ object ReolinkModule extends CameraModule with MqttCameraModule with ActorContex
                 case CameraModuleAction(_, _, req@SetIrLightsActionRequest(mode, replyTo)) if caps.irlights =>
                     val a = ReolinkRequests.setIrLights(setup.host, mode)
                     context.pipeToSelf(a)(wrapGenericResponse(req))
-                    awaitingCommandResult(setup, caps, replyTo)
+                    awaitingCommandResult(setup, caps, aiDetectionTrackingActor, replyTo)
                 case CameraModuleAction(_, _, req@SetMotionSensActionRequest(mode, replyTo)) if caps.motionSens =>
                     val a = ReolinkRequests.setAlarmSens(setup.host, mode)
                     context.pipeToSelf(a)(wrapGenericResponse(req))
-                    awaitingCommandResult(setup, caps, replyTo)
-                case CameraModuleAction(_, _, req@SetFTPEnabledActionRequest(mode, replyTo)) if caps.ftp =>
-                    val a = ReolinkRequests.setFTPEnabled(setup.host, mode)
+                    awaitingCommandResult(setup, caps, aiDetectionTrackingActor, replyTo)
+                case CameraModuleAction(_, _, req@SetFTPEnabledActionRequest(mode, replyTo)) if caps.ftp || caps.ftpV20 =>
+                    val a = if (caps.ftp) ReolinkRequests.setFTPEnabled(setup.host, mode)
+                            else ReolinkRequests.setFTPV20Enabled(setup.host, mode)
                     context.pipeToSelf(a)(wrapGenericResponse(req))
-                    awaitingCommandResult(setup, caps, replyTo)
-                case CameraModuleAction(_, _, req@SetRecordEnabledActionRequest(mode, replyTo)) if caps.record =>
-                    val a = ReolinkRequests.setRecordEnabled(setup.host, mode)
+                    awaitingCommandResult(setup, caps, aiDetectionTrackingActor, replyTo)
+                case CameraModuleAction(_, _, req@SetRecordEnabledActionRequest(mode, replyTo)) if caps.record ||  caps.recordV20 =>
+                    val a = if (caps.record) ReolinkRequests.setRecordEnabled(setup.host, mode)
+                            else ReolinkRequests.setRecordV20Enabled(setup.host, mode)
                     context.pipeToSelf(a)(wrapGenericResponse(req))
-                    awaitingCommandResult(setup, caps, replyTo)
+                    awaitingCommandResult(setup, caps, aiDetectionTrackingActor, replyTo)
                 case CameraModuleAction(_, _, req) =>
                     req.replyTo.foreach(_ ! CameraActionResponse(Left(new IllegalArgumentException("operation not supported by camera"))))
+                    Behaviors.same
+                case CameraModuleEvent(_, _, CameraMotionEvent(_, _, motion)) =>
+                    if (caps.aiDetection && motion && aiDetectionTrackingActor.isEmpty) {
+                        // start AITracker if device has capability
+                        val ai = context.spawn(ReolinkAIDetectionTrackingActor.apply(context.self, setup.host), "reolinkAITracker")
+                        awaitingCommand(setup, caps, Some(ai))
+                    } else if (caps.aiDetection && !motion && aiDetectionTrackingActor.isDefined) {
+                        // stop AITracker if spawned
+                        aiDetectionTrackingActor.foreach(_ ! ReolinkAIDetectionTrackingActor.Terminate)
+                        awaitingCommand(setup, caps, None)
+                    } else {
+                        Behaviors.same
+                    }
+                case WrappedModuleCmd(ReolinkAIMotionDetectionStateUpdate(k, motion)) =>
+                    // publish AI detection state to MQTT
+                    updateAIDetectionState(setup)(k, motion)
                     Behaviors.same
                 case TerminateCam =>
                     Behaviors.stopped
@@ -196,12 +218,13 @@ object ReolinkModule extends CameraModule with MqttCameraModule with ActorContex
         }
     }
 
-    private def awaitingCommandResult(setup: Setup, caps: ReolinkCapabilities, replyTo: Option[ActorRef[CameraActionResponse]]): Behavior[CameraCmd] = {
+    private def awaitingCommandResult(setup: Setup, caps: ReolinkCapabilities, aiDetectionTrackingActor: Option[ActorRef[AITrackerCmd]],
+                                      replyTo: Option[ActorRef[CameraActionResponse]]): Behavior[CameraCmd] = {
         Behaviors.withStash(100) { buffer =>
             Behaviors.receiveMessagePartial {
                 case WrappedModuleCmd(resp: CameraActionResponse) =>
                     replyTo.foreach(_ ! resp)
-                    buffer.unstashAll(awaitingCommand(setup, caps))
+                    buffer.unstashAll(awaitingCommand(setup, caps, aiDetectionTrackingActor))
                 case WrappedModuleCmd(GenericReolinkCmdResponse(req, result)) =>
                     // if result is OK, update state
                     if (result.result.isRight) {
@@ -222,7 +245,7 @@ object ReolinkModule extends CameraModule with MqttCameraModule with ActorContex
                         }
                     }
                     replyTo.foreach(_ ! result)
-                    buffer.unstashAll(awaitingCommand(setup, caps))
+                    buffer.unstashAll(awaitingCommand(setup, caps, aiDetectionTrackingActor))
                 case TerminateCam =>
                     Behaviors.stopped
                 case other =>
@@ -291,6 +314,9 @@ object ReolinkModule extends CameraModule with MqttCameraModule with ActorContex
     }
 
     override def eventToMqttMessage(ev: CameraProtocol.CameraEvent): Option[MqttMessage] = ev match {
+        case CameraStateBoolEvent(cameraId, moduleId, param, state) if param.startsWith(CAM_PARAM_AIDETECTION_STATE) =>
+            val str = if (state) "on" else "off"
+            Some(MqttMessage(s"${cameraEventModulePath(cameraId, moduleId)}/$param/detected", ByteString(str)))
         case CameraStateBoolEvent(cameraId, moduleId, param, state) if CAM_PARAMS.contains(param) =>
             val str = if (state) "on" else "off"
             Some(MqttMessage(s"${cameraStateModulePath(cameraId, moduleId)}/$param", ByteString(str)))
@@ -328,5 +354,9 @@ object ReolinkModule extends CameraModule with MqttCameraModule with ActorContex
 
     private def updateRecordState(setup: Setup)(enabled: Boolean): Unit  = {
         setup.parent ! CameraModuleEvent(setup.camera.cameraId, moduleId, CameraStateBoolEvent(setup.camera.cameraId, moduleId, CAM_PARAM_RECORD, enabled))
+    }
+
+    private def updateAIDetectionState(setup: Setup)(aiKey: String, motion: Boolean): Unit  = {
+        setup.parent ! CameraModuleEvent(setup.camera.cameraId, moduleId, CameraStateBoolEvent(setup.camera.cameraId, moduleId, s"$CAM_PARAM_AIDETECTION_STATE/$aiKey", motion))
     }
 }

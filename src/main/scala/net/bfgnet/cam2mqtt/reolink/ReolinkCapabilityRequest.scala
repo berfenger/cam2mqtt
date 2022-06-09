@@ -17,7 +17,10 @@ trait ReolinkCapabilityRequest extends ReolinkRequest {
             ReolinkCmd("GetIsp", 1, Channel(0)),
             ReolinkCmd("GetZoomFocus", 1, Channel(0)),
             ReolinkCmd("GetFtp", 0, Channel(0)),
+            ReolinkCmd("GetFtpV20", 0, Channel(0)),
             ReolinkCmd("GetRec", 1, Channel(0)),
+            ReolinkCmd("GetRecV20", 1, Channel(0)),
+            ReolinkCmd("GetAiState", 0, Channel(0)),
             ReolinkCmd("GetAlarm", 1, GetAlarmCommand(GetAlarmCommandParams(0, "md")))
         )
         for {
@@ -50,7 +53,10 @@ trait ReolinkCapabilityRequest extends ReolinkRequest {
             case "GetZoomFocus" => Try(parseGetZoomFocus(caps, state, result)).toOption.getOrElse((caps, state))
             case "GetAlarm" => Try(parseGetAlarm(caps, state, result)).toOption.getOrElse((caps, state))
             case "GetFtp" => Try(parseGetFtp(caps, state, result)).toOption.getOrElse((caps, state))
+            case "GetFtpV20" => Try(parseGetFtpV20(caps, state, result)).toOption.getOrElse((caps, state))
             case "GetRec" => Try(parseGetRec(caps, state, result)).toOption.getOrElse((caps, state))
+            case "GetRecV20" => Try(parseGetRecV20(caps, state, result)).toOption.getOrElse((caps, state))
+            case "GetAiState" => Try(parseGetAiState(caps, state, result)).toOption.getOrElse((caps, state))
             case _ => (caps, state)
         }
     }
@@ -126,13 +132,44 @@ trait ReolinkCapabilityRequest extends ReolinkRequest {
         }
     }
 
+    private def parseGetFtpV20(caps: ReolinkCapabilities, state: ReolinkState, result: Either[ReolinkCmdResponseError, JSONObject]): (ReolinkCapabilities, ReolinkState) = {
+        result match {
+            case Left(_) => (caps, state)
+            case Right(json) =>
+                val ftp = json.getJSONObject("Ftp")
+                val params = OM.readValue(ftp.toString, classOf[SetFtpV20CommandParams])
+                (caps.copy(ftpV20 = true), state.copy(ftp = Option(params.enable == 1)))
+        }
+    }
+
     private def parseGetRec(caps: ReolinkCapabilities, state: ReolinkState, result: Either[ReolinkCmdResponseError, JSONObject]): (ReolinkCapabilities, ReolinkState) = {
         result match {
             case Left(_) => (caps, state)
             case Right(json) =>
-                val ftp = json.getJSONObject("Rec")
-                val params = OM.readValue(ftp.toString, classOf[SetRecCommandParams])
+                val rec = json.getJSONObject("Rec")
+                val params = OM.readValue(rec.toString, classOf[SetRecCommandParams])
                 (caps.copy(record = true), state.copy(record = Option(params.schedule.enable == 1)))
+        }
+    }
+
+    private def parseGetRecV20(caps: ReolinkCapabilities, state: ReolinkState, result: Either[ReolinkCmdResponseError, JSONObject]): (ReolinkCapabilities, ReolinkState) = {
+        result match {
+            case Left(_) => (caps, state)
+            case Right(json) =>
+                val rec = json.getJSONObject("Rec")
+                val params = OM.readValue(rec.toString, classOf[SetRecV20CommandParams])
+                (caps.copy(recordV20 = true), state.copy(record = Option(params.enable == 1)))
+        }
+    }
+
+    private[reolink] def parseGetAiState(caps: ReolinkCapabilities, state: ReolinkState, result: Either[ReolinkCmdResponseError, JSONObject]): (ReolinkCapabilities, ReolinkState) = {
+        result match {
+            case Left(_) => (caps, state)
+            case Right(json) =>
+                val params = OM.readValue(json.toString, classOf[GetAiStateParams])
+                val supported = params.dog_cat.isSupported || params.face.isSupported || params.people.isSupported ||
+                    params.vehicle.isSupported
+                (caps.copy(aiDetection = supported), state.copy(aiDetectionState = Some(params)))
         }
     }
 

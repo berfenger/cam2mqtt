@@ -84,10 +84,10 @@ trait OnvifGetPropertiesRequests extends OnvifRequest with OnvifAuth {
     private def parseCapabilities(xml: String): OnvifCapabilitiesResponse = {
         val doc = Jsoup.parse(xml, "", Parser.xmlParser())
         val caps = doc.select("*|Envelope > *|Body > *|GetCapabilitiesResponse > *|Capabilities")
-        val hasEvents = Option(caps.select("*|Events > *|XAddr")).filterNot(_.isEmpty).map(_.text()).exists(_.length > 0)
+        val hasEvents = Option(caps.select("*|Events > *|XAddr")).filterNot(_.isEmpty).map(_.text()).exists(_.nonEmpty)
         val hasPPS = Option(caps.select("*|Events > *|WSPullPointSupport")).filterNot(_.isEmpty).map(_.text()).contains("true")
-        val hasImaging = Option(caps.select("*|Imaging > *|XAddr")).filterNot(_.isEmpty).map(_.text()).exists(_.length > 0)
-        val hasPTZ = Option(caps.select("*|PTZ > *|XAddr")).filterNot(_.isEmpty).map(_.text()).exists(_.length > 0)
+        val hasImaging = Option(caps.select("*|Imaging > *|XAddr")).filterNot(_.isEmpty).map(_.text()).exists(_.nonEmpty)
+        val hasPTZ = Option(caps.select("*|PTZ > *|XAddr")).filterNot(_.isEmpty).map(_.text()).exists(_.nonEmpty)
         OnvifCapabilitiesResponse(hasEvents, hasPPS, hasImaging, hasPTZ)
     }
 
