@@ -38,6 +38,7 @@ object ReolinkAIDetectionTrackingActor extends ActorContextImplicits {
                 case CheckAIState =>
                     context.pipeToSelf(ReolinkRequests.getAiState(host)) {
                         case Success(Some(value)) => GotAIStates(convertAIDetectionStates(value))
+                        case Success(None) => GotAIStateFailure(None)
                         case Failure(err) => GotAIStateFailure(Option(err))
                     }
                     context.setReceiveTimeout(1500.millis, GotAIStateFailure(None))
