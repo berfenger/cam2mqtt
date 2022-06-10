@@ -1,10 +1,8 @@
 FROM alpine:3.15.1
 
-RUN apk add --no-cache unzip openjdk8-jre
+RUN apk add --no-cache unzip
 
 ADD . /app_src
-WORKDIR /app_src
-RUN ./gradlew build
 
 WORKDIR /usr/src/app
 
