@@ -2,7 +2,7 @@ package net.bfgnet.cam2mqtt.reolink
 
 import akka.actor.ClassicActorSystemProvider
 import net.bfgnet.cam2mqtt.camera.CameraActionProtocol.NightVisionMode
-import net.bfgnet.cam2mqtt.camera.modules.reolink.{ReolinkCapabilities, ReolinkState}
+import net.bfgnet.cam2mqtt.camera.modules.reolink.{AiDetectionMode, ReolinkCapabilities, ReolinkState}
 import org.codehaus.jettison.json.{JSONArray, JSONObject}
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -169,7 +169,7 @@ trait ReolinkCapabilityRequest extends ReolinkRequest {
                 val params = OM.readValue(json.toString, classOf[GetAiStateParams])
                 val supported = params.dog_cat.isSupported || params.face.isSupported || params.people.isSupported ||
                     params.vehicle.isSupported
-                (caps.copy(aiDetection = supported), state.copy(aiDetectionState = Some(params)))
+                (caps.copy(aiDetection = supported), state.copy(aiDetectionMode = AiDetectionMode.OnMotion, aiDetectionState = Some(params)))
         }
     }
 

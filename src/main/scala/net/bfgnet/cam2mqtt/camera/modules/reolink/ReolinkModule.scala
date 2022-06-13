@@ -17,19 +17,25 @@ import scala.util.{Failure, Success, Try}
 
 sealed trait ReolinkResponse
 
+object AiDetectionMode extends Enumeration {
+    type AiDetectionMode = Value
+    val UnSupported, Available, Continuous, OnMotion = Value
+}
+
 object ReolinkCapabilities {
     def defaultCapabilities: ReolinkCapabilities = ReolinkCapabilities(nightVision = false, irlights = false,
         motionSens = false, ftp = false, ftpV20 = false, record = false, recordV20 = false, ptzZoom = false,
         aiDetection = false)
 
-    def defaultState: ReolinkState = ReolinkState(None, None, None, None, None, None, None)
+    def defaultState: ReolinkState = ReolinkState(None, None, None, None, None, None, AiDetectionMode.UnSupported, None)
 }
 
 case class ReolinkCapabilities(nightVision: Boolean, irlights: Boolean, motionSens: Boolean, ftp: Boolean,
                                ftpV20: Boolean, record: Boolean, recordV20: Boolean, ptzZoom: Boolean, aiDetection: Boolean)
 
 case class ReolinkState(nightVision: Option[NightVisionMode.Value], irlights: Option[Boolean], motionSens: Option[Int],
-                        ftp: Option[Boolean], record: Option[Boolean], zoomAbsLevel: Option[Int], aiDetectionState: Option[GetAiStateParams])
+                        ftp: Option[Boolean], record: Option[Boolean], zoomAbsLevel: Option[Int],
+                        aiDetectionMode: AiDetectionMode.Value, aiDetectionState: Option[GetAiStateParams])
 
 case class ReolinkInitialState(caps: ReolinkCapabilities, state: ReolinkState)
 
@@ -43,10 +49,12 @@ object ReolinkModule extends CameraModule with MqttCameraModule with ActorContex
     private val CAM_PARAM_MOTION_SENS = "motion/sensitivity"
     private val CAM_PARAM_FTP = "ftp"
     private val CAM_PARAM_RECORD = "record"
+    private val CAM_PARAM_AI_DETECTION_MODE = "ai_detection_mode"
     private val CAM_PARAM_ZOOM_ABS = "ptz/zoom/absolute"
     private val CAM_PARAM_AIDETECTION_STATE = "aidetection"
 
-    private val CAM_PARAMS = List(CAM_PARAM_NIGHTVISION, CAM_PARAM_IRLIGHTS, CAM_PARAM_MOTION_SENS, CAM_PARAM_FTP, CAM_PARAM_RECORD, CAM_PARAM_ZOOM_ABS)
+    private val CAM_PARAMS = List(CAM_PARAM_NIGHTVISION, CAM_PARAM_IRLIGHTS, CAM_PARAM_MOTION_SENS, CAM_PARAM_FTP,
+        CAM_PARAM_RECORD, CAM_PARAM_ZOOM_ABS, CAM_PARAM_AI_DETECTION_MODE)
 
     private val NIGHVISION_VALUES = List("on", "off", "auto")
 
@@ -148,6 +156,9 @@ object ReolinkModule extends CameraModule with MqttCameraModule with ActorContex
                         cmd.state.record.foreach {
                             updateRecordState(setup)
                         }
+                    }
+                    if (cmd.state.aiDetectionMode != AiDetectionMode.UnSupported) {
+                        updateAiDetectionMode(setup)(cmd.state.aiDetectionMode)
                     }
                     awaitingCommand(setup, cmd.caps, None)
                 case TerminateCam =>
@@ -354,6 +365,16 @@ object ReolinkModule extends CameraModule with MqttCameraModule with ActorContex
 
     private def updateRecordState(setup: Setup)(enabled: Boolean): Unit  = {
         setup.parent ! CameraModuleEvent(setup.camera.cameraId, moduleId, CameraStateBoolEvent(setup.camera.cameraId, moduleId, CAM_PARAM_RECORD, enabled))
+    }
+
+    private def updateAiDetectionMode(setup: Setup)(aiDetectionMode: AiDetectionMode.Value): Unit  = {
+        val v = aiDetectionMode match {
+            case AiDetectionMode.UnSupported => "unsupported"
+            case AiDetectionMode.OnMotion => "on_motion"
+            case AiDetectionMode.Continuous => "continuous"
+            case AiDetectionMode.Available => "available"
+        }
+        setup.parent ! CameraModuleEvent(setup.camera.cameraId, moduleId, CameraStateStringEvent(setup.camera.cameraId, moduleId, CAM_PARAM_AI_DETECTION_MODE, v))
     }
 
     private def updateAIDetectionState(setup: Setup)(aiKey: String, motion: Boolean): Unit  = {

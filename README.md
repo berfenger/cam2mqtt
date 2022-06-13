@@ -71,6 +71,7 @@ Feel free to try other cameras and let me know if it works so I can update this 
     cam2mqtt/camera/{cameraId}/state/reolink/ptz/zoom/absolute 0-100
     cam2mqtt/camera/{cameraId}/state/reolink/record on/off
     cam2mqtt/camera/{cameraId}/state/reolink/ftp on/off
+    cam2mqtt/camera/{cameraId}/state/reolink/ai_detection_mode on_motion
 
 ##### Commands
     cam2mqtt/camera/{cameraId}/command/reolink/nightvision auto/on/off
