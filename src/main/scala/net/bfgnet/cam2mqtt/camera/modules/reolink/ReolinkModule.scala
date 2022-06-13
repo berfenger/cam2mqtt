@@ -1,6 +1,6 @@
 package net.bfgnet.cam2mqtt.camera.modules.reolink
 
-import akka.actor.typed.scaladsl.Behaviors
+import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
 import akka.actor.typed.{ActorRef, Behavior}
 import akka.stream.alpakka.mqtt.MqttMessage
 import akka.util.ByteString
@@ -13,6 +13,7 @@ import net.bfgnet.cam2mqtt.camera.{CameraActionProtocol, CameraProtocol}
 import net.bfgnet.cam2mqtt.reolink.{GetAiStateParams, ReolinkCmdResponse, ReolinkHost, ReolinkRequests}
 import net.bfgnet.cam2mqtt.utils.ActorContextImplicits
 
+import scala.collection.mutable
 import scala.util.{Failure, Success, Try}
 
 sealed trait ReolinkResponse
@@ -119,7 +120,9 @@ object ReolinkModule extends CameraModule with MqttCameraModule with ActorContex
         Behaviors.setup { implicit context =>
             // launch get capabilities and state
             context.pipeToSelf(ReolinkRequests.getCapabilities(setup.host).map(r => ReolinkInitialState(r._1, r._2))) {
-                case Success(value) => WrappedModuleCmd(value)
+                case Success(value) =>
+                    logCapabilities(setup.camera.cameraId, value.caps)
+                    WrappedModuleCmd(value)
                 case Failure(exception) =>
                     context.log.error(s"could not get reolink capabilities from device ${setup.camera.cameraId}", exception)
                     WrappedModuleCmd(ReolinkInitialState(ReolinkCapabilities.defaultCapabilities, ReolinkCapabilities.defaultState))
@@ -379,5 +382,36 @@ object ReolinkModule extends CameraModule with MqttCameraModule with ActorContex
 
     private def updateAIDetectionState(setup: Setup)(aiKey: String, motion: Boolean): Unit  = {
         setup.parent ! CameraModuleEvent(setup.camera.cameraId, moduleId, CameraStateBoolEvent(setup.camera.cameraId, moduleId, s"$CAM_PARAM_AIDETECTION_STATE/$aiKey", motion))
+    }
+
+    private def logCapabilities(cameraId: String, caps: ReolinkCapabilities)(implicit _ac: ActorContext[_]) = {
+        val c = new mutable.StringBuilder()
+        c ++= s"Reolink Capabilities for camera $cameraId:\n"
+        if (caps.irlights) {
+            c ++= s"IR lights: ${caps.irlights}\n"
+        }
+        if (caps.nightVision) {
+            c ++= s"Night vision: ${caps.nightVision}\n"
+        }
+        if (caps.motionSens) {
+            c ++= s"Motion Sensitivity: ${caps.motionSens}\n"
+        }
+        if (caps.record) {
+            c ++= s"Record: ${caps.record}\n"
+        } else if (caps.recordV20) {
+            c ++= s"Record (V2): ${caps.recordV20}\n"
+        }
+        if (caps.ftp) {
+            c ++= s"FTP: ${caps.ftp}\n"
+        } else if (caps.ftpV20) {
+            c ++= s"FTP (V2): ${caps.ftpV20}\n"
+        }
+        if (caps.ptzZoom) {
+            c ++= s"PTZ Zoom: ${caps.ptzZoom}\n"
+        }
+        if (caps.aiDetection) {
+            c ++= s"AI Detection: ${caps.aiDetection}\n"
+        }
+        _ac.log.info(c.toString().trim)
     }
 }

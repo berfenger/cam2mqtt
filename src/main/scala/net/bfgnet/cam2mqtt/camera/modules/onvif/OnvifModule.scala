@@ -14,6 +14,7 @@ import net.bfgnet.cam2mqtt.onvif.OnvifGetPropertiesRequests.OnvifCapabilitiesRes
 import net.bfgnet.cam2mqtt.onvif.OnvifRequests
 import net.bfgnet.cam2mqtt.utils.ActorContextImplicits
 
+import scala.collection.mutable
 import scala.util.{Failure, Success, Try}
 
 sealed trait OnvifModuleCmd
@@ -36,6 +37,7 @@ object OnvifModule extends CameraModule with MqttCameraModule with ActorContextI
 
             Behaviors.receiveMessagePartial[CameraCmd] {
                 case WrappedModuleCmd(oc@OnvifCapabilities(cap)) =>
+                    logCapabilities(camera.cameraId, cap)
                     // start subscription
                     val subBehav = if (cap.hasEvents && config.monitorEvents) {
                         // webhook
@@ -124,5 +126,20 @@ object OnvifModule extends CameraModule with MqttCameraModule with ActorContextI
             val value = if (motion) "on" else "off"
             Some(MqttMessage(s"${cameraEventModulePath(cameraId, moduleId)}/motion", ByteString(value)))
         case _ => None
+    }
+
+    private def logCapabilities(cameraId: String, caps: OnvifCapabilitiesResponse)(implicit _ac: ActorContext[_]) = {
+        val c = new mutable.StringBuilder()
+        c ++= s"ONVIF Capabilities for camera $cameraId:\n"
+        if (caps.hasEvents) {
+            c ++= s"Events: ${caps.hasEvents}\n"
+        }
+        if (caps.hasPullPointSupport) {
+            c ++= s"Pull-Point subscription: ${caps.hasPullPointSupport}\n"
+        }
+        if (caps.hasPTZ) {
+            c ++= s"PTZ: ${caps.hasPTZ}\n"
+        }
+        _ac.log.info(c.toString().trim)
     }
 }
