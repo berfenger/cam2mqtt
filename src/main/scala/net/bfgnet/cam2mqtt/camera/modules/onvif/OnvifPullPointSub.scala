@@ -1,10 +1,9 @@
 package net.bfgnet.cam2mqtt.camera.modules.onvif
 
 import java.io.IOException
-
 import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.{ActorRef, Behavior, PostStop}
-import net.bfgnet.cam2mqtt.camera.CameraConfig.CameraInfo
+import net.bfgnet.cam2mqtt.camera.CameraConfig.{CameraInfo, OnvifCameraModuleConfig}
 import net.bfgnet.cam2mqtt.camera.CameraProtocol._
 import net.bfgnet.cam2mqtt.camera.modules.onvif.OnvifSubProtocol._
 import net.bfgnet.cam2mqtt.onvif.OnvifRequests
@@ -18,15 +17,15 @@ import scala.util.{Failure, Success}
 
 object OnvifPullPointSub extends ActorContextImplicits {
 
-    def apply(parent: ActorRef[CameraCmd], info: CameraInfo): Behavior[OnvifSubCmd] = stopped(parent, info)
+    def apply(parent: ActorRef[CameraCmd], info: CameraInfo, config: OnvifCameraModuleConfig): Behavior[OnvifSubCmd] = stopped(parent, info, config)
 
-    private def stopped(parent: ActorRef[CameraCmd], info: CameraInfo): Behavior[OnvifSubCmd] = {
+    private def stopped(parent: ActorRef[CameraCmd], info: CameraInfo, config: OnvifCameraModuleConfig): Behavior[OnvifSubCmd] = {
         Behaviors.setup { implicit context =>
             context.setLoggerName(OnvifPullPointSub.getClass)
 
             // create subscription on start
             context.log.debug(s"starting pullpoint subscription on device ${info.copyWithPrivacy()}")
-            val subs = OnvifRequests.createPullPointSubscription(info.host, info.port, info.username, info.password, 60)
+            val subs = OnvifRequests.createPullPointSubscription(info.host, config.port, info.username, info.password, 60)
             context.pipeToSelf(subs) {
                 case Success(value) => Subscribed(value)
                 case Failure(err) => SubscriptionError(err)
@@ -36,7 +35,7 @@ object OnvifPullPointSub extends ActorContextImplicits {
                 case Subscribed(sub) =>
                     notifyAvailability(parent, info.cameraId, available = true)
                     context.self ! PullMessages
-                    subscribed(parent, info, sub)
+                    subscribed(parent, info, config, sub)
                 case SubscriptionError(err) =>
                     context.log.error("subscription error", err)
                     notifyAvailability(parent, info.cameraId, available = false)
@@ -45,7 +44,7 @@ object OnvifPullPointSub extends ActorContextImplicits {
         }
     }
 
-    private def subscribed(parent: ActorRef[CameraCmd], info: CameraInfo, subscription: SubscriptionInfo): Behavior[OnvifSubCmd] = {
+    private def subscribed(parent: ActorRef[CameraCmd], info: CameraInfo, config: OnvifCameraModuleConfig, subscription: SubscriptionInfo): Behavior[OnvifSubCmd] = {
         Behaviors.setup { implicit context =>
             val timeToRenew = subscription.terminationTime - System.currentTimeMillis()
             context.log.debug(s"pullpoint subscription renewed: millis remaining until next renew = $timeToRenew")
@@ -54,14 +53,14 @@ object OnvifPullPointSub extends ActorContextImplicits {
                 case RenewSubscription =>
                     renewEv.cancel()
                     context.log.debug(s"Renew subscription")
-                    val subs = OnvifRequests.renewSubscription(info.host, info.port, info.username, info.password, subscription.address, 60, subscription.isPullPointSub)
+                    val subs = OnvifRequests.renewSubscription(info.host, config.port, info.username, info.password, subscription.address, 60, subscription.isPullPointSub)
                     context.pipeToSelf(subs) {
                         case Success(value) => Subscribed(value)
                         case Failure(err) => SubscriptionError(err)
                     }
                     Behaviors.same
                 case Subscribed(sub) =>
-                    subscribed(parent, info, sub)
+                    subscribed(parent, info, config, sub)
                 case SubscriptionError(err: IOException) =>
                     context.log.error("subscription IO error", err)
                     notifyAvailability(parent, info.cameraId, available = false)
@@ -81,7 +80,7 @@ object OnvifPullPointSub extends ActorContextImplicits {
                     Behaviors.same
                 case PullMessages =>
                     // pull messages from subscription
-                    val pullMsgs = OnvifRequests.pullMessagesFromSubscription(info.host, info.port, info.username, info.password, subscription.address, 10)
+                    val pullMsgs = OnvifRequests.pullMessagesFromSubscription(info.host, config.port, info.username, info.password, subscription.address, 10)
                     context.pipeToSelf(pullMsgs) {
                         case Success(value) =>
                             val messages = parsePullPointMessage(info.cameraId, value).map(List(_)).getOrElse(Nil)
@@ -92,12 +91,12 @@ object OnvifPullPointSub extends ActorContextImplicits {
                     Behaviors.same
                 case TerminateSubscription =>
                     // cleanup resources on device
-                    val f = OnvifRequests.unsubscribe(info.host, info.port, info.username, info.password, subscription.address)
+                    val f = OnvifRequests.unsubscribe(info.host, config.port, info.username, info.password, subscription.address)
                     context.pipeToSelf(f)(_ => Unsubscribed)
                     finishing()
             }.receiveSignal {
                 case (_, PostStop) =>
-                    OnvifRequests.unsubscribe(info.host, info.port, info.username, info.password, subscription.address)
+                    OnvifRequests.unsubscribe(info.host, config.port, info.username, info.password, subscription.address)
                     renewEv.cancel()
                     finishing()
             }

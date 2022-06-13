@@ -12,21 +12,25 @@ webhook:
 cameras:
   reolink_cam_1:
     host: 192.168.4.1
-    port: 8000
     username: admin
     password: somepass
     modules:
       onvif:
+        port: 8000
         monitor_events: true
         prefer_webhook_subscription: false
       reolink:
+        # port: 443 # optional. 443/HTTPS by default
+        # username: bob # optional. Alternative username for Reolink API
+        # password: bobpass # optional. Alternative password for Reolink API
+        # ssl: false # optional. Use ssl/HTTPS
         sync_datetime: false
   onvif_cam_1:
     host: 192.168.4.2
-    port: 8000
     username: admin
     password: somepass
     modules:
       onvif:
+        port: 8000
         monitor_events: true
         prefer_webhook_subscription: false

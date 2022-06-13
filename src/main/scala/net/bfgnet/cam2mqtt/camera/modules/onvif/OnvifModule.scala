@@ -14,7 +14,7 @@ import net.bfgnet.cam2mqtt.onvif.OnvifGetPropertiesRequests.OnvifCapabilitiesRes
 import net.bfgnet.cam2mqtt.onvif.OnvifRequests
 import net.bfgnet.cam2mqtt.utils.ActorContextImplicits
 
-import scala.util.{Failure, Success}
+import scala.util.{Failure, Success, Try}
 
 sealed trait OnvifModuleCmd
 
@@ -26,23 +26,23 @@ object OnvifModule extends CameraModule with MqttCameraModule with ActorContextI
     override val moduleId: String = "onvif"
 
     override def createBehavior(camera: ActorRef[CameraCmd], info: CameraInfo, config: CameraModuleConfig): Behavior[CameraCmd] =
-        stopped(camera, info, Option(config).filter(_.isInstanceOf[OnvifCameraModuleConfig]).map(_.asInstanceOf[OnvifCameraModuleConfig]))
+        stopped(camera, info, config.asInstanceOf[OnvifCameraModuleConfig])
 
     private def stopped(parent: ActorRef[CameraCmd], camera: CameraInfo,
-                        config: Option[OnvifCameraModuleConfig]): Behavior[CameraCmd] = {
+                        config: OnvifCameraModuleConfig): Behavior[CameraCmd] = {
         Behaviors.setup[CameraCmd] { implicit context =>
 
-            getOnvifCapabilities(camera)
+            getOnvifCapabilities(camera, config)
 
             Behaviors.receiveMessagePartial[CameraCmd] {
                 case WrappedModuleCmd(oc@OnvifCapabilities(cap)) =>
                     // start subscription
-                    val subBehav = if (cap.hasEvents && config.exists(_.monitorEvents)) {
+                    val subBehav = if (cap.hasEvents && config.monitorEvents) {
                         // webhook
-                        val a = if (config.exists(_.preferWebhookSub) || !cap.hasPullPointSupport) {
-                            OnvifWebhookSub.apply(context.self, ConfigManager.webhookSubscription, camera)
+                        val a = if (config.preferWebhookSub || !cap.hasPullPointSupport) {
+                            OnvifWebhookSub.apply(context.self, ConfigManager.webhookSubscription, camera, config)
                         } else { // pull point
-                            OnvifPullPointSub.apply(context.self, camera)
+                            OnvifPullPointSub.apply(context.self, camera, config)
                         }
                         Some(a)
                     } else None
@@ -103,17 +103,18 @@ object OnvifModule extends CameraModule with MqttCameraModule with ActorContextI
                 }
         }
 
-    private def getOnvifCapabilities(camera: CameraInfo)(implicit _ac: ActorContext[CameraCmd]) = {
-        _ac.pipeToSelf(OnvifRequests.getCapabilities(camera.host, camera.port, camera.username, camera.password)) {
+    private def getOnvifCapabilities(camera: CameraInfo, config: OnvifCameraModuleConfig)(implicit _ac: ActorContext[CameraCmd]) = {
+        _ac.pipeToSelf(OnvifRequests.getCapabilities(camera.host, config.port, camera.username, camera.password)) {
             case Success(r) => WrappedModuleCmd(OnvifCapabilities(r))
             case Failure(ex) => WrappedModuleCmd(OnvifError(ex))
         }
     }
 
     override def loadConfiguration(from: Map[String, Any]): CameraModuleConfig = {
+        val port = Try(from.get("port").filter(_ != null).map(_.toString.toInt)).toOption.flatten.getOrElse(8000)
         val monitorEvs = from.get("monitor_events").filter(_ != null).map(_.toString).contains("true")
         val preferWebhook = from.get("prefer_webhook_subscription").filter(_ != null).map(_.toString).contains("true")
-        OnvifCameraModuleConfig(monitorEvs, preferWebhook)
+        OnvifCameraModuleConfig(port, monitorEvs, preferWebhook)
     }
 
     override def parseMQTTCommand(path: List[String], stringData: String): Option[CameraActionProtocol.CameraActionRequest] = None

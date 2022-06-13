@@ -31,7 +31,12 @@ trait ReolinkRequest {
         val ent = HttpEntity.apply(ContentType.apply(MediaTypes.`application/json`), body)
         val _req = HttpRequest(uri = cmdUrl(host, cmd), method = HttpMethods.POST).withEntity(ent)
         http.singleRequest(_req, connectionContext = insecureHttpsContext).flatMap { r =>
-            Unmarshal(r.entity.withSizeLimit(MAX_BODY_SIZE)).to[String]
+            if (r.status.isRedirection())
+                throw new Exception("could not query camera. HTTP port may be disabled.")
+            else if (r.status.isSuccess())
+                Unmarshal(r.entity.withSizeLimit(MAX_BODY_SIZE)).to[String]
+            else
+                throw new Exception(s"could not query camera (HTTP ${r.status.intValue()} ${host}")
         }
     }
 

@@ -2,7 +2,7 @@ package net.bfgnet.cam2mqtt.camera.modules.onvif
 
 import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.{ActorRef, Behavior}
-import net.bfgnet.cam2mqtt.camera.CameraConfig.CameraInfo
+import net.bfgnet.cam2mqtt.camera.CameraConfig.{CameraInfo, OnvifCameraModuleConfig}
 import net.bfgnet.cam2mqtt.camera.CameraProtocol.{CameraAvailableEvent, CameraCmd, CameraEvent, CameraModuleEvent, CameraMotionEvent}
 import net.bfgnet.cam2mqtt.camera.modules.onvif.OnvifSubProtocol._
 import net.bfgnet.cam2mqtt.config.WebhookConfig
@@ -17,14 +17,15 @@ import scala.util.{Failure, Success}
 
 object OnvifWebhookSub extends ActorContextImplicits {
 
-    def apply(parent: ActorRef[CameraCmd], webhookConfig: WebhookConfig, info: CameraInfo): Behavior[OnvifSubCmd] = stopped(parent, webhookConfig, info)
+    def apply(parent: ActorRef[CameraCmd], webhookConfig: WebhookConfig, info: CameraInfo,
+              config: OnvifCameraModuleConfig): Behavior[OnvifSubCmd] = stopped(parent, webhookConfig, info, config)
 
-    private def stopped(parent: ActorRef[CameraCmd], webhookConfig: WebhookConfig, info: CameraInfo): Behavior[OnvifSubCmd] = {
+    private def stopped(parent: ActorRef[CameraCmd], webhookConfig: WebhookConfig, info: CameraInfo, config: OnvifCameraModuleConfig): Behavior[OnvifSubCmd] = {
         Behaviors.setup { implicit context =>
             // create subscription on start
             context.log.debug(s"starting webhook subscription on device ${info.copyWithPrivacy()}")
             val webhookUrl = concatUrl(webhookConfig.external_url, s"onvif/webhook/camera/${info.cameraId}")
-            val subs = OnvifRequests.subscribe(info.host, info.port, info.username, info.password, webhookUrl, 60)
+            val subs = OnvifRequests.subscribe(info.host, config.port, info.username, info.password, webhookUrl, 60)
             context.pipeToSelf(subs) {
                 case Success(value) => Subscribed(value)
                 case Failure(err) => SubscriptionError(err)
@@ -33,7 +34,7 @@ object OnvifWebhookSub extends ActorContextImplicits {
             Behaviors.receiveMessagePartial[OnvifSubCmd] {
                 case Subscribed(sub) =>
                     notifyAvailability(parent, info.cameraId, available = true)
-                    subscribed(parent, info, sub)
+                    subscribed(parent, info, config, sub)
                 case SubscriptionError(err) =>
                     context.log.error("subscription error", err)
                     notifyAvailability(parent, info.cameraId, available = false)
@@ -42,7 +43,7 @@ object OnvifWebhookSub extends ActorContextImplicits {
         }
     }
 
-    private def subscribed(parent: ActorRef[CameraCmd], info: CameraInfo, subscription: SubscriptionInfo): Behavior[OnvifSubCmd] = {
+    private def subscribed(parent: ActorRef[CameraCmd], info: CameraInfo, config: OnvifCameraModuleConfig, subscription: SubscriptionInfo): Behavior[OnvifSubCmd] = {
         Behaviors.setup { implicit context =>
             context.log.debug(s"webhook subscription renewed: millis remaining until next renew = ${subscription.terminationTime - System.currentTimeMillis()}")
             val timeToRenew = subscription.terminationTime - System.currentTimeMillis() - 15
@@ -50,7 +51,7 @@ object OnvifWebhookSub extends ActorContextImplicits {
             Behaviors.receiveMessagePartial[OnvifSubCmd] {
                 case RenewSubscription =>
                     context.log.debug(s"Renew subscription")
-                    val subs = OnvifRequests.renewSubscription(info.host, info.port, info.username, info.password, subscription.address, 60, subscription.isPullPointSub)
+                    val subs = OnvifRequests.renewSubscription(info.host, config.port, info.username, info.password, subscription.address, 60, subscription.isPullPointSub)
                     context.pipeToSelf(subs) {
                         case Success(value) => Subscribed(value)
                         case Failure(err) => SubscriptionError(err)
@@ -62,7 +63,7 @@ object OnvifWebhookSub extends ActorContextImplicits {
                     context.self ! TerminateSubscription
                     Behaviors.same
                 case Subscribed(sub) =>
-                    subscribed(parent, info, sub)
+                    subscribed(parent, info, config, sub)
                 case WebhookNotification(msg) =>
                     val ev = parseNotification(info.cameraId, msg)
                     // send camera event to parent
@@ -70,7 +71,7 @@ object OnvifWebhookSub extends ActorContextImplicits {
                     Behaviors.same
                 case TerminateSubscription =>
                     // cleanup resources on device
-                    val f = OnvifRequests.unsubscribe(info.host, info.port, info.username, info.password, subscription.address)
+                    val f = OnvifRequests.unsubscribe(info.host, config.port, info.username, info.password, subscription.address)
                     context.pipeToSelf(f)(_ => Unsubscribed)
                     finishing()
             }

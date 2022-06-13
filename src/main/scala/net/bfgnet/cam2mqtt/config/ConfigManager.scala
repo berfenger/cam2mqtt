@@ -38,7 +38,7 @@ object ConfigManager {
             val rawConfig = ConfigParser.loadRawConfig(file)
             val cams = rawConfig.cameras.toList.map { case (k, v) =>
                 val vs = v.asInstanceOf[Map[String, Any]]
-                val c = CameraInfo(k, vs("host").asString, vs("port").asString.toInt, vs("username").asString, vs("password").asString, Nil)
+                val c = CameraInfo(k, vs("host").asString, vs("username").asString, vs("password").asString, Nil)
 
                 val mods = vs("modules").asMap.toList.map { case (m, mc) =>
                     val mod = CameraModules.MODULES.find(_.moduleId == m).getOrElse(throw new ModuleNotFoundException(m))

@@ -61,10 +61,10 @@ object ReolinkModule extends CameraModule with MqttCameraModule with ActorContex
             case _ => ReolinkCameraModuleConfig(None, None, None, None, syncDateTime = false)
         }
         val reoHost = ReolinkHost(info.host,
-            modCfg.port.getOrElse(80),
+            modCfg.port.getOrElse(443),
             modCfg.altUsername.getOrElse(info.username),
             modCfg.altPassword.getOrElse(info.password),
-            modCfg.useSSL.getOrElse(false)
+            modCfg.useSSL.getOrElse(modCfg.port.forall(_ == 443))
         )
         val setup = Setup(camera, info, reoHost, modCfg)
         if (modCfg.syncDateTime) {
@@ -266,9 +266,9 @@ object ReolinkModule extends CameraModule with MqttCameraModule with ActorContex
     override def loadConfiguration(from: Map[String, Any]): CameraModuleConfig = {
         val syncDateTime = from.get("sync_datetime").filter(_ != null).map(_.toString).contains("true")
         val port = from.get("port").filter(_ != null).flatMap(v => Try(v.toString.toInt).toOption)
-        val ssl = from.get("use_ssl").filter(_ != null).map(_.toString).filter(v => v == "true" || v == "false").map(v => if (v == "true") true else false)
-        val username = from.get("username").filter(_ != null).map(_.toString).filter(_.length > 0)
-        val password = from.get("password").filter(_ != null).map(_.toString).filter(_.length > 0)
+        val ssl = from.get("ssl").filter(_ != null).map(_.toString).filter(v => v == "true" || v == "false").map(v => if (v == "true") true else false)
+        val username = from.get("username").filter(_ != null).map(_.toString).filter(_.nonEmpty)
+        val password = from.get("password").filter(_ != null).map(_.toString).filter(_.nonEmpty)
         ReolinkCameraModuleConfig(port, ssl, username, password, syncDateTime)
     }
 

@@ -98,11 +98,11 @@ object CameraConfig {
         def copyWithPrivacy(): ModConf
     }
 
-    case class CameraInfo(cameraId: String, host: String, port: Int, username: String, password: String, modules: List[CameraModuleConfig]) {
+    case class CameraInfo(cameraId: String, host: String, username: String, password: String, modules: List[CameraModuleConfig]) {
         def copyWithPrivacy(): CameraInfo = this.copy(password = "redacted", modules = modules.map(_.copyWithPrivacy()))
     }
 
-    case class OnvifCameraModuleConfig(monitorEvents: Boolean, preferWebhookSub: Boolean) extends CameraModuleConfig {
+    case class OnvifCameraModuleConfig(port: Int, monitorEvents: Boolean, preferWebhookSub: Boolean) extends CameraModuleConfig {
         override val moduleId: String = OnvifModule.moduleId
 
         override type ModConf = OnvifCameraModuleConfig
