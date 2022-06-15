@@ -49,7 +49,7 @@ trait ReolinkRequest {
     }
 
     def cmdUrl(host: ReolinkHost, cmd: Option[String]) = {
-        val params = List("username" -> host.username, "password" -> host.password) ++ cmd.map(c => List("cmd" -> c)).getOrElse(Nil)
+        val params = List("user" -> host.username, "password" -> host.password) ++ cmd.map(c => List("cmd" -> c)).getOrElse(Nil)
         val scheme = if (host.ssl) "https" else "http"
         Uri.apply(s"$scheme://${host.host}:${host.port}/cgi-bin/api.cgi?${queryParams(params)}")
     }
