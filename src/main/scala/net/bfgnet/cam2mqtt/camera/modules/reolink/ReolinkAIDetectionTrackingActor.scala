@@ -25,15 +25,12 @@ object ReolinkAIDetectionTrackingActor extends ActorContextImplicits {
 
     case class ReolinkAIMotionDetectionStateUpdate(key: String, motion: Boolean)
 
-    def apply(parent: ActorRef[CameraCmd], host: ReolinkHost): Behavior[AITrackerCmd] = {
-        Behaviors.setup { implicit context =>
-            running(parent, host, Nil)
-        }
-    }
+    def apply(parent: ActorRef[CameraCmd], host: ReolinkHost): Behavior[AITrackerCmd] =
+        running(parent, host, Nil, first = true)
 
-    def running(parent: ActorRef[CameraCmd], host: ReolinkHost, states: List[AIDetectionState]): Behavior[AITrackerCmd] = {
+    def running(parent: ActorRef[CameraCmd], host: ReolinkHost, states: List[AIDetectionState], first: Boolean = false): Behavior[AITrackerCmd] = {
         Behaviors.setup { implicit context =>
-            val sched = context.scheduleOnce(2.seconds, context.self, CheckAIState)
+            val sched = context.scheduleOnce(if (first) 500.millis else 2.seconds, context.self, CheckAIState)
             Behaviors.receiveMessagePartial {
                 case CheckAIState =>
                     context.pipeToSelf(ReolinkRequests.getAiState(host)) {
@@ -41,8 +38,9 @@ object ReolinkAIDetectionTrackingActor extends ActorContextImplicits {
                         case Success(None) => GotAIStateFailure(None)
                         case Failure(err) => GotAIStateFailure(Option(err))
                     }
-                    context.setReceiveTimeout(1500.millis, GotAIStateFailure(None))
                     waitingForCommand(parent, host, states)
+                case GotAIStateFailure(_) =>
+                    Behaviors.same
                 case Terminate =>
                     sched.cancel()
                     notifyParentOnStatesOnTerminate(parent, states)
@@ -53,6 +51,7 @@ object ReolinkAIDetectionTrackingActor extends ActorContextImplicits {
 
     def waitingForCommand(parent: ActorRef[CameraCmd], host: ReolinkHost, states: List[AIDetectionState]): Behavior[AITrackerCmd] = {
         Behaviors.setup { implicit context =>
+            context.setReceiveTimeout(1500.millis, GotAIStateFailure(None))
             Behaviors.receiveMessagePartial {
                 case GotAIStates(newStates) =>
                     // check state changes to notify
@@ -65,11 +64,17 @@ object ReolinkAIDetectionTrackingActor extends ActorContextImplicits {
                         parent ! WrappedModuleCmd(ReolinkAIMotionDetectionStateUpdate(s.key, motion = s.alarmState))
                     }
                     // reschedule next event
+                    context.cancelReceiveTimeout()
                     running(parent, host, newStates)
-                case GotAIStateFailure(_) =>
+                case GotAIStateFailure(err) =>
+                    err.foreach { ex =>
+                        context.log.error(s"could not get AI state: ${ex}")
+                    }
+                    context.cancelReceiveTimeout()
                     running(parent, host, states)
                 case Terminate =>
                     notifyParentOnStatesOnTerminate(parent, states)
+                    context.cancelReceiveTimeout()
                     Behaviors.stopped
             }
         }
