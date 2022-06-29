@@ -14,6 +14,7 @@ import org.jsoup.parser.Parser
 
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
+import scala.jdk.CollectionConverters._
 
 object OnvifWebhookSub extends ActorContextImplicits {
 
@@ -87,19 +88,28 @@ object OnvifWebhookSub extends ActorContextImplicits {
         }
     }
 
-    private def parseNotification(id: String, xml: String)(implicit _context: ActorContext[_]): Option[CameraEvent] = {
+    private def parseNotification(id: String, xml: String)(implicit _context: ActorContext[_]): List[CameraEvent] = {
         _context.log.trace(s"subscription message: $xml")
         val doc = Jsoup.parse(xml, "", Parser.xmlParser())
-        val notif = doc.select("*|Envelope > *|Body > *|Notify > *|NotificationMessage")
-        val topic = notif.select("*|Topic").text()
-        topic match {
-            case "tns1:RuleEngine/CellMotionDetector/Motion" =>
-                val motion = notif.select("*|Message > *|Data > *|SimpleItem[Name='IsMotion']")
-                if (!motion.isEmpty) {
-                    val isMotion = motion.attr("Value") == "true"
-                    Option(CameraMotionEvent(id, OnvifModule.moduleId, isMotion))
-                } else None
-            case _ => None
+        val notifs = doc.select("*|Envelope > *|Body > *|Notify > *|NotificationMessage").listIterator().asScala.toList
+        notifs.flatMap { n =>
+            val topic = n.select("*|Topic").text()
+            stripNS(topic) match {
+                case "RuleEngine/CellMotionDetector/Motion" =>
+                    val motion = n.select("*|Message > *|Data > *|SimpleItem[Name='IsMotion']")
+                    if (!motion.isEmpty) {
+                        val isMotion = motion.attr("Value") == "true"
+                        Option(CameraMotionEvent(id, OnvifModule.moduleId, isMotion))
+                    } else None
+                case _ => None
+            }
+        }
+    }
+
+    private def stripNS(str: String) = {
+        str.indexOf(":") match {
+            case idx if idx > 0 => str.substring(idx + 1)
+            case _ => str
         }
     }
 
