@@ -1,7 +1,7 @@
 package net.bfgnet.cam2mqtt.camera.modules.onvif
 
 import java.io.IOException
-import akka.actor.typed.scaladsl.Behaviors
+import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
 import akka.actor.typed.{ActorRef, Behavior, PostStop}
 import net.bfgnet.cam2mqtt.camera.CameraConfig.{CameraInfo, OnvifCameraModuleConfig}
 import net.bfgnet.cam2mqtt.camera.CameraProtocol._
@@ -112,7 +112,8 @@ object OnvifPullPointSub extends ActorContextImplicits {
         }
     }
 
-    private def parsePullPointMessage(id: String, xml: String): Option[CameraEvent] = {
+    private def parsePullPointMessage(id: String, xml: String)(implicit _context: ActorContext[_]): Option[CameraEvent] = {
+        _context.log.trace(s"subscription message: $xml")
         val doc = Jsoup.parse(xml, "", Parser.xmlParser())
         val notif = doc.select("*|Envelope > *|Body > *|PullMessagesResponse > *|NotificationMessage")
         val topic = notif.select("*|Topic").text()

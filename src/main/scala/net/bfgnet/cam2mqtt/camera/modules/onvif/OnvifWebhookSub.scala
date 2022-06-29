@@ -1,6 +1,6 @@
 package net.bfgnet.cam2mqtt.camera.modules.onvif
 
-import akka.actor.typed.scaladsl.Behaviors
+import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
 import akka.actor.typed.{ActorRef, Behavior}
 import net.bfgnet.cam2mqtt.camera.CameraConfig.{CameraInfo, OnvifCameraModuleConfig}
 import net.bfgnet.cam2mqtt.camera.CameraProtocol.{CameraAvailableEvent, CameraCmd, CameraEvent, CameraModuleEvent, CameraMotionEvent}
@@ -87,7 +87,8 @@ object OnvifWebhookSub extends ActorContextImplicits {
         }
     }
 
-    private def parseNotification(id: String, xml: String): Option[CameraEvent] = {
+    private def parseNotification(id: String, xml: String)(implicit _context: ActorContext[_]): Option[CameraEvent] = {
+        _context.log.trace(s"subscription message: $xml")
         val doc = Jsoup.parse(xml, "", Parser.xmlParser())
         val notif = doc.select("*|Envelope > *|Body > *|Notify > *|NotificationMessage")
         val topic = notif.select("*|Topic").text()
