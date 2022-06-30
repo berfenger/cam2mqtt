@@ -5,6 +5,7 @@ mqtt:
   password: pass
   #base_name: cam2mqtt
   ssl: false
+  #required: true # leave it on true (default) to avoid losing messages on startup
 
 webhook:
   external_url: http://192.168.0.1:8080 # only needed for webhook subscriptions

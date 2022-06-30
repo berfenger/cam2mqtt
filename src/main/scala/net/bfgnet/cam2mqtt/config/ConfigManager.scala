@@ -12,7 +12,7 @@ import net.bfgnet.cam2mqtt.camera.CameraConfig.CameraInfo
 import net.bfgnet.cam2mqtt.camera.modules.CameraModules
 import net.bfgnet.cam2mqtt.config.ConfigExceptions.{InvalidConfigFileFormat, ModuleNotFoundException}
 
-case class MqttConfig(host: String, port: Int, username: String, password: String, ssl: Boolean, base_name: Option[String])
+case class MqttConfig(host: String, port: Int, username: String, password: String, ssl: Boolean, required: Option[Boolean], base_name: Option[String])
 
 case class WebhookConfig(external_url: String)
 
@@ -62,7 +62,7 @@ object ConfigManager {
     }
 
     private def env(variable: String): Option[String] =
-        Option(System.getenv(variable)).filter(_.length > 0)
+        Option(System.getenv(variable)).filter(_.nonEmpty)
 
     def cameras: List[CameraInfo] = _camerasConfig
     def mqtt: MqttConfig = _mqttConfig.getOrElse(throw new RuntimeException("config is not loaded"))

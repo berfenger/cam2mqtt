@@ -2,6 +2,7 @@ package net.bfgnet.cam2mqtt.mqtt
 
 import akka.Done
 import akka.actor.ActorRef
+import akka.actor.typed.{ActorRef => TypedActorRef}
 import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.scaladsl.adapter._
 import akka.actor.typed.{Behavior, SupervisorStrategy}
@@ -9,12 +10,14 @@ import akka.stream.alpakka.mqtt.scaladsl.{MqttFlow, MqttMessageWithAck}
 import akka.stream.alpakka.mqtt.{MqttConnectionSettings, MqttMessage, MqttQoS, MqttSubscriptions}
 import akka.stream.scaladsl.{Flow, Keep, RunnableGraph, Sink, Source}
 import akka.stream.{ActorAttributes, CompletionStrategy, OverflowStrategy, Supervision}
+
 import javax.net.ssl.SSLContext
 import net.bfgnet.cam2mqtt.camera.CameraProtocol.{CameraAvailableEvent, CameraEvent}
 import net.bfgnet.cam2mqtt.camera.modules.CameraModules
 import net.bfgnet.cam2mqtt.config.{ConfigManager, MqttConfig}
 import net.bfgnet.cam2mqtt.eventbus.CameraEventBus
 import net.bfgnet.cam2mqtt.mqtt.MqttProtocol._
+import net.bfgnet.cam2mqtt.system.{O2MCommand, WrappedMqttConnectionCmd}
 import net.bfgnet.cam2mqtt.utils.ActorContextImplicits
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence
 
@@ -46,7 +49,7 @@ object MqttProtocol {
 
 object MqttSystem extends ActorContextImplicits {
 
-    def apply(cfg: MqttConfig): Behavior[MqttCmd] = {
+    def apply(cfg: MqttConfig, parent: TypedActorRef[O2MCommand]): Behavior[MqttCmd] = {
         val baseTopic = cfg.base_name.getOrElse("cam2mqtt")
         Behaviors.supervise[MqttCmd] {
             Behaviors.setup { implicit context =>
@@ -75,6 +78,7 @@ object MqttSystem extends ActorContextImplicits {
                         CameraEventBus.bus.subscribe(act.toClassic, CameraEventBus.TOPIC_OBJECT_DETECTION)
                         CameraEventBus.bus.subscribe(act.toClassic, CameraEventBus.TOPIC_AVAILABILITY)
                         CameraEventBus.bus.subscribe(act.toClassic, CameraEventBus.TOPIC_OTHER)
+                        parent ! WrappedMqttConnectionCmd(MQTTConnected)
                         connected(act.toClassic, mqttStream)
                     case TerminatedWithError(err) =>
                         context.log.error("mqtt client connection error", err)

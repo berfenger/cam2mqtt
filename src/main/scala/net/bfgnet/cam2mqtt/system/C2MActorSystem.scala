@@ -2,8 +2,10 @@ package net.bfgnet.cam2mqtt.system
 
 import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.{ActorRef, ActorSystem, Behavior, Terminated}
+import net.bfgnet.cam2mqtt.camera.CameraManProtocol.CameraManCmd
 import net.bfgnet.cam2mqtt.camera.{CameraMan, CameraManProtocol => cman}
 import net.bfgnet.cam2mqtt.config.ConfigManager
+import net.bfgnet.cam2mqtt.mqtt.MqttProtocol.{MQTTConnected, MqttCmd}
 import net.bfgnet.cam2mqtt.mqtt.MqttSystem
 import net.bfgnet.cam2mqtt.mqtt.{MqttProtocol => mqtt}
 
@@ -12,6 +14,8 @@ sealed trait O2MCommand
 case class WrappedCameraManCmd(cmd: cman.CameraManCmd) extends O2MCommand
 
 case class WrappedMqttCmd(cmd: mqtt.MqttCmd) extends O2MCommand
+
+case class WrappedMqttConnectionCmd(cmd: mqtt.MqttCmd) extends O2MCommand
 
 case object Terminate extends O2MCommand
 
@@ -37,21 +41,33 @@ object O2MActorSystem {
 
     private def apply(): Behavior[O2MCommand] = {
         Behaviors.setup { context =>
-            val cameraManRef = context.spawn(CameraMan.apply(ConfigManager.cameras), "cameraman")
-            val mqttRef = context.spawn(MqttSystem.apply(ConfigManager.mqtt), "mqtt")
-            context.watch(cameraManRef)
+            val mqttRef = context.spawn(MqttSystem.apply(ConfigManager.mqtt, context.self), "mqtt")
             context.watch(mqttRef)
+            if (ConfigManager.mqtt.required.contains(false)) {
+                context.self !  WrappedMqttConnectionCmd(MQTTConnected)
+            }
+            running(None, mqttRef)
+        }
+    }
+
+    private def running(cameraManActor: Option[ActorRef[CameraManCmd]], mqttActor: ActorRef[MqttCmd]): Behavior[O2MCommand] = {
+        Behaviors.setup { context =>
             Behaviors.receiveMessagePartial[O2MCommand] {
                 case WrappedCameraManCmd(cmd) =>
-                    cameraManRef ! cmd
+                    cameraManActor.foreach(_ ! cmd)
                     Behaviors.same
                 case WrappedMqttCmd(cmd) =>
-                    mqttRef ! cmd
+                    mqttActor ! cmd
                     Behaviors.same
+                case WrappedMqttConnectionCmd(_ : MQTTConnected.type) if cameraManActor.isEmpty =>
+                    // initialize cameraCam once MQTT is connected, not before
+                    val cameraManRef = context.spawn(CameraMan.apply(ConfigManager.cameras), "cameraman")
+                    context.watch(cameraManRef)
+                    running(Some(cameraManRef), mqttActor)
                 case Terminate =>
-                    cameraManRef ! cman.Terminate
-                    mqttRef ! mqtt.Terminate
-                    finishing(List(cameraManRef, mqttRef))
+                    cameraManActor.foreach(_ ! cman.Terminate)
+                    mqttActor ! mqtt.Terminate
+                    finishing(cameraManActor.toList ++ List(mqttActor))
             }
         }
     }
