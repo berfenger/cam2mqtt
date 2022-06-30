@@ -51,6 +51,9 @@ object Camera {
                     modules.get(ReolinkModule.moduleId).foreach(_ ! CameraModuleEvent(ev.cameraId, ev.moduleId, ev))
                     routing(info, modules, ev.motion, available)
                 } else Behaviors.same
+            case CameraModuleEvent(_, _, ev: CameraObjectDetectionEvent) =>
+                CameraEventBus.bus.publish(ev)
+                Behaviors.same
             case CameraModuleEvent(_, _, ev: CameraAvailableEvent) if available != ev.available =>
                 // if available state does not change, discard event
                 if (available != ev.available) {

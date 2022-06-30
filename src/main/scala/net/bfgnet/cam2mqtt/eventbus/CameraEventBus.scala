@@ -2,13 +2,14 @@ package net.bfgnet.cam2mqtt.eventbus
 
 import akka.actor.ActorRef
 import akka.event.{EventBus, LookupClassification}
-import net.bfgnet.cam2mqtt.camera.CameraProtocol.{CameraAvailableEvent, CameraEvent, CameraMotionEvent}
+import net.bfgnet.cam2mqtt.camera.CameraProtocol.{CameraAvailableEvent, CameraEvent, CameraMotionEvent, CameraObjectDetectionEvent}
 import net.bfgnet.cam2mqtt.eventbus.CameraEventBus._
 
 object CameraEventBus {
 
     val TOPIC_AVAILABILITY = "av"
     val TOPIC_MOTION = "motion"
+    val TOPIC_OBJECT_DETECTION = "object_detection"
     val TOPIC_OTHER = "oth"
 
     lazy val bus = new CameraEventBus()
@@ -28,6 +29,8 @@ class CameraEventBus extends EventBus with LookupClassification {
     override protected def publish(event: EventTopicEnvelope, subscriber: ActorRef): Unit = subscriber ! event.msg
 
     def publish(event: CameraMotionEvent): Unit = this.publish(EventTopicEnvelope(TOPIC_MOTION, event))
+
+    def publish(event: CameraObjectDetectionEvent): Unit = this.publish(EventTopicEnvelope(TOPIC_OBJECT_DETECTION, event))
 
     def publish(event: CameraAvailableEvent): Unit = this.publish(EventTopicEnvelope(TOPIC_AVAILABILITY, event))
 

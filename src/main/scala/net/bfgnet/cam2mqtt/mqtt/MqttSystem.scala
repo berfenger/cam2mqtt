@@ -72,6 +72,7 @@ object MqttSystem extends ActorContextImplicits {
                     case MQTTConnected =>
                         context.log.info("mqtt client successfully connected")
                         CameraEventBus.bus.subscribe(act.toClassic, CameraEventBus.TOPIC_MOTION)
+                        CameraEventBus.bus.subscribe(act.toClassic, CameraEventBus.TOPIC_OBJECT_DETECTION)
                         CameraEventBus.bus.subscribe(act.toClassic, CameraEventBus.TOPIC_AVAILABILITY)
                         CameraEventBus.bus.subscribe(act.toClassic, CameraEventBus.TOPIC_OTHER)
                         connected(act.toClassic, mqttStream)

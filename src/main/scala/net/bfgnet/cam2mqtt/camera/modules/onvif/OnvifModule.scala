@@ -125,6 +125,9 @@ object OnvifModule extends CameraModule with MqttCameraModule with ActorContextI
         case CameraMotionEvent(cameraId, moduleId, motion) =>
             val value = if (motion) "on" else "off"
             Some(MqttMessage(s"${cameraEventModulePath(cameraId, moduleId)}/motion", ByteString(value)))
+        case CameraObjectDetectionEvent(cameraId, moduleId, objectClass, detection) =>
+            val value = if (detection) "on" else "off"
+            Some(MqttMessage(s"${cameraEventModulePath(cameraId, moduleId)}/object/$objectClass/detected", ByteString(value)))
         case _ => None
     }
 

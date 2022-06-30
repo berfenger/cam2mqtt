@@ -3,13 +3,14 @@ package net.bfgnet.cam2mqtt.camera.modules.onvif
 import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
 import akka.actor.typed.{ActorRef, Behavior}
 import net.bfgnet.cam2mqtt.camera.CameraConfig.{CameraInfo, OnvifCameraModuleConfig}
-import net.bfgnet.cam2mqtt.camera.CameraProtocol.{CameraAvailableEvent, CameraCmd, CameraEvent, CameraModuleEvent, CameraMotionEvent}
+import net.bfgnet.cam2mqtt.camera.CameraProtocol.{CameraAvailableEvent, CameraCmd, CameraEvent, CameraModuleEvent, CameraMotionEvent, CameraObjectDetectionEvent}
 import net.bfgnet.cam2mqtt.camera.modules.onvif.OnvifSubProtocol._
 import net.bfgnet.cam2mqtt.config.WebhookConfig
 import net.bfgnet.cam2mqtt.onvif.OnvifRequests
 import net.bfgnet.cam2mqtt.onvif.OnvifSubscriptionRequests.SubscriptionInfo
 import net.bfgnet.cam2mqtt.utils.ActorContextImplicits
 import org.jsoup.Jsoup
+import org.jsoup.nodes.Element
 import org.jsoup.parser.Parser
 
 import scala.concurrent.duration._
@@ -96,14 +97,31 @@ object OnvifWebhookSub extends ActorContextImplicits {
             val topic = n.select("*|Topic").text()
             stripNS(topic) match {
                 case "RuleEngine/CellMotionDetector/Motion" =>
-                    val motion = n.select("*|Message > *|Data > *|SimpleItem[Name='IsMotion']")
+                    val motion = n.select("*|Message[PropertyOperation='Changed'] > *|Data > *|SimpleItem[Name='IsMotion']")
                     if (!motion.isEmpty) {
                         val isMotion = motion.attr("Value") == "true"
                         Option(CameraMotionEvent(id, OnvifModule.moduleId, isMotion))
                     } else None
+                // AI object detection on Reolink cameras (firmware >= 3.1.0.951, April 2022)
+                case "RuleEngine/MyRuleDetector/PeopleDetect" =>
+                    parseAIDetectionEvent(id, n, "people")
+                case "RuleEngine/MyRuleDetector/FaceDetect" =>
+                    parseAIDetectionEvent(id, n, "face")
+                case "RuleEngine/MyRuleDetector/VehicleDetect" =>
+                    parseAIDetectionEvent(id, n, "vehicle")
+                case "RuleEngine/MyRuleDetector/DogCatDetect" =>
+                    parseAIDetectionEvent(id, n, "pet")
                 case _ => None
             }
         }
+    }
+
+    private def parseAIDetectionEvent(id: String, notif: Element, objectClass: String) = {
+        val motion = notif.select("*|Message[PropertyOperation='Changed'] > *|Data > *|SimpleItem[Name='State']")
+        if (!motion.isEmpty) {
+            val isDect = motion.attr("Value") == "true"
+            Option(CameraObjectDetectionEvent(id, OnvifModule.moduleId, objectClass, isDect))
+        } else None
     }
 
     private def stripNS(str: String) = {
