@@ -20,8 +20,9 @@ This program is designed with reliability in mind. Every component is independen
 to recover by itself if any connection problem happens.
 
 For now only two modules are implemented:
-* ONVIF:
-  * Events: motion events
+* ONVIF Events:
+  * Motion events
+  * AI powered object detection (only Reolink cameras on firmwares >= April 2022).
 * Reolink:
   * Control
     * PTZ (absolute zoom)
@@ -31,10 +32,10 @@ For now only two modules are implemented:
     * Sync date time
     * Enable/disable Record (V1 & V2)
     * Enable/disable FTP (V1 & V2)
-  * AI motion detection
+  * AI powered object detection
     * Person detection
     * Vehicle detection
-    * Pet detection (not yet supported by firmware)
+    * Pet detection (not yet supported on some firmwares)
     * Face detection (not yet supported by firmware)
 
 ## Requirements
@@ -43,10 +44,8 @@ For now only two modules are implemented:
 * Al least one compatible camera
 
 ## Hardware Compatibility
-* Reolink RLC-520
-* Reolink RLC-511w
-* Reolink RLC-811A
-* Reolink RLC-520A (incl. people and vehicle AI detection)
+* Reolink RLC-520, RLC-511W
+* Reolink RLC-520A, RLC-810A, RLC-811A, RLC-822A (incl. people and vehicle AI detection)
 * Other Reolink ONVIF cameras should work.
 * Any other IP camera supporting ONVIF event subscriptions (webhook or pullpoint-subscription based) should work.
 
