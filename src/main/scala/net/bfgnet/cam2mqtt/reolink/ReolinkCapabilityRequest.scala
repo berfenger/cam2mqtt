@@ -169,7 +169,7 @@ trait ReolinkCapabilityRequest extends ReolinkRequest {
                 val params = OM.readValue(json.toString, classOf[GetAiStateParams])
                 val supported = params.dog_cat.isSupported || params.face.isSupported || params.people.isSupported ||
                     params.vehicle.isSupported
-                (caps.copy(aiDetection = supported), state.copy(aiDetectionMode = AiDetectionMode.OnMotion, aiDetectionState = Some(params)))
+                (caps.copy(aiDetection = supported), state.copy(aiDetectionMode = AiDetectionMode.Available, aiDetectionState = Some(params)))
         }
     }
 

@@ -25,6 +25,7 @@ cameras:
         # username: bob # optional. Alternative username for Reolink API
         # password: bobpass # optional. Alternative password for Reolink API
         # ssl: false # optional. Use ssl/HTTPS
+        ai_detection_mode: off # one of [off, on_motion, continuous]. on_motion requires onvif module to detect motion
         sync_datetime: false
   onvif_cam_1:
     host: 192.168.4.2

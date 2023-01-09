@@ -6,7 +6,7 @@ import net.bfgnet.cam2mqtt.camera.CameraConfig.CameraInfo
 import net.bfgnet.cam2mqtt.camera.CameraProtocol.CameraCmd
 import net.bfgnet.cam2mqtt.camera.modules.generic.GenericMqttCamModule
 import net.bfgnet.cam2mqtt.camera.modules.onvif.OnvifModule
-import net.bfgnet.cam2mqtt.camera.modules.reolink.ReolinkModule
+import net.bfgnet.cam2mqtt.camera.modules.reolink.{AiDetectionMode, ReolinkModule}
 
 object CameraManProtocol {
 
@@ -112,7 +112,9 @@ object CameraConfig {
         override def copyWithPrivacy(): OnvifCameraModuleConfig = this
     }
 
-    case class ReolinkCameraModuleConfig(port: Option[Int], useSSL: Option[Boolean], altUsername: Option[String], altPassword: Option[String], syncDateTime: Boolean) extends CameraModuleConfig {
+    case class ReolinkCameraModuleConfig(port: Option[Int], useSSL: Option[Boolean],
+                                         altUsername: Option[String], altPassword: Option[String],
+                                         syncDateTime: Boolean, aiDetectionMode: Option[AiDetectionMode.Value]) extends CameraModuleConfig {
         override val moduleId: String = ReolinkModule.moduleId
 
         override type ModConf = ReolinkCameraModuleConfig

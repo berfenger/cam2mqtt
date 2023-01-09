@@ -67,7 +67,7 @@ object ReolinkModule extends CameraModule with MqttCameraModule with ActorContex
 
         val modCfg = config match {
             case c: ReolinkCameraModuleConfig => c
-            case _ => ReolinkCameraModuleConfig(None, None, None, None, syncDateTime = false)
+            case _ => ReolinkCameraModuleConfig(None, None, None, None, syncDateTime = false, None)
         }
         val reoHost = ReolinkHost(info.host,
             modCfg.port.getOrElse(443),
@@ -160,10 +160,17 @@ object ReolinkModule extends CameraModule with MqttCameraModule with ActorContex
                             updateRecordState(setup)
                         }
                     }
-                    if (cmd.state.aiDetectionMode != AiDetectionMode.UnSupported) {
-                        updateAiDetectionMode(setup)(cmd.state.aiDetectionMode)
-                    }
-                    awaitingCommand(setup, cmd.caps, None)
+                    // Combine config.aiDetectionMode with detected capabilities
+                    val aiDetectionModeMod = if (cmd.state.aiDetectionMode != AiDetectionMode.UnSupported) {
+                        val ais = setup.config.aiDetectionMode.getOrElse(cmd.state.aiDetectionMode)
+                        updateAiDetectionMode(setup)(ais)
+                        ais
+                    } else AiDetectionMode.UnSupported
+                    // init ReolinkAIDetectionTrackingActor if mode is continuous
+                    val aiTrackerActor = if (aiDetectionModeMod == AiDetectionMode.Continuous) {
+                        Some(context.spawn(ReolinkAIDetectionTrackingActor(context.self, setup.host), "reolinkAITracker"))
+                    } else None
+                    awaitingCommand(setup.copy(config = setup.config.copy(aiDetectionMode = Some(aiDetectionModeMod))), cmd.caps, aiTrackerActor)
                 case TerminateCam =>
                     Behaviors.stopped
             }
@@ -211,11 +218,13 @@ object ReolinkModule extends CameraModule with MqttCameraModule with ActorContex
                     req.replyTo.foreach(_ ! CameraActionResponse(Left(new IllegalArgumentException("operation not supported by camera"))))
                     Behaviors.same
                 case CameraModuleEvent(_, _, CameraMotionEvent(_, _, motion)) =>
-                    if (caps.aiDetection && motion && aiDetectionTrackingActor.isEmpty) {
+                    if (caps.aiDetection && motion && aiDetectionTrackingActor.isEmpty &&
+                            setup.config.aiDetectionMode.contains(AiDetectionMode.OnMotion)) {
                         // start AITracker if device has capability
-                        val ai = context.spawn(ReolinkAIDetectionTrackingActor.apply(context.self, setup.host), "reolinkAITracker")
+                        val ai = context.spawn(ReolinkAIDetectionTrackingActor(context.self, setup.host), "reolinkAITracker")
                         awaitingCommand(setup, caps, Some(ai))
-                    } else if (caps.aiDetection && !motion && aiDetectionTrackingActor.isDefined) {
+                    } else if (caps.aiDetection && !motion && aiDetectionTrackingActor.isDefined &&
+                            setup.config.aiDetectionMode.contains(AiDetectionMode.OnMotion)) {
                         // stop AITracker if spawned
                         aiDetectionTrackingActor.foreach(_ ! ReolinkAIDetectionTrackingActor.Terminate)
                         awaitingCommand(setup, caps, None)
@@ -283,7 +292,13 @@ object ReolinkModule extends CameraModule with MqttCameraModule with ActorContex
         val ssl = from.get("ssl").filter(_ != null).map(_.toString).filter(v => v == "true" || v == "false").map(v => if (v == "true") true else false)
         val username = from.get("username").filter(_ != null).map(_.toString).filter(_.nonEmpty)
         val password = from.get("password").filter(_ != null).map(_.toString).filter(_.nonEmpty)
-        ReolinkCameraModuleConfig(port, ssl, username, password, syncDateTime)
+        val aiDetectionMode = from.get("ai_detection_mode").filter(_ != null).map(_.toString).filter(_.nonEmpty).map(_.toLowerCase()) match {
+            case Some("off") | Some("onvif") | Some("available") => Some(AiDetectionMode.Available)
+            case Some("on_motion") => Some(AiDetectionMode.OnMotion)
+            case Some("continuous") => Some(AiDetectionMode.Continuous)
+            case _ => None
+        }
+        ReolinkCameraModuleConfig(port, ssl, username, password, syncDateTime, aiDetectionMode)
     }
 
     override def parseMQTTCommand(path: List[String], stringData: String): Option[CameraActionProtocol.CameraActionRequest] = {
@@ -375,7 +390,7 @@ object ReolinkModule extends CameraModule with MqttCameraModule with ActorContex
             case AiDetectionMode.UnSupported => "unsupported"
             case AiDetectionMode.OnMotion => "on_motion"
             case AiDetectionMode.Continuous => "continuous"
-            case AiDetectionMode.Available => "available"
+            case AiDetectionMode.Available => "off"
         }
         setup.parent ! CameraModuleEvent(setup.camera.cameraId, moduleId, CameraStateStringEvent(setup.camera.cameraId, moduleId, CAM_PARAM_AI_DETECTION_MODE, v))
     }

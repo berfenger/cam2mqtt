@@ -45,7 +45,7 @@ For now only two modules are implemented:
 
 ## Hardware Compatibility
 * Reolink RLC-520, RLC-511W
-* Reolink RLC-520A, RLC-810A, RLC-811A, RLC-822A (incl. people and vehicle AI detection)
+* Reolink RLC-520A, RLC-511WA, RLC-810A, RLC-811A, RLC-822A (incl. people and vehicle AI detection)
 * Other Reolink ONVIF cameras should work.
 * Any other IP camera supporting ONVIF event subscriptions (webhook or pullpoint-subscription based) should work.
 
@@ -56,12 +56,16 @@ Feel free to try other cameras and let me know if it works so I can update this 
 ##### Camera availability
     cam2mqtt/camera/{cameraId}/status online/offline
 
-#### Onvif module
+### Onvif module
 
 ##### Motion events
     cam2mqtt/camera/{cameraId}/event/onvif/motion on/off
 
-#### Reolink module
+##### AI Detection events (Reolink firmware >= 3.1.0.951, april 2022)
+    cam2mqtt/camera/{cameraId}/event/onvif/object/people/detected on/off
+    cam2mqtt/camera/{cameraId}/event/onvif/object/vehicle/detected on/off
+
+### Reolink module
 
 ##### States
     cam2mqtt/camera/{cameraId}/state/reolink/nightvision auto/on/off
@@ -86,6 +90,16 @@ Feel free to try other cameras and let me know if it works so I can update this 
     cam2mqtt/camera/{cameraId}/event/reolink/aidetection/vehicle/detected on/off
     cam2mqtt/camera/{cameraId}/event/reolink/aidetection/pet/detected on/off
     cam2mqtt/camera/{cameraId}/event/reolink/aidetection/face/detected on/off
+
+## Clarification on Reolink's AI-based detection capabilities
+
+Reolink cameras have 2 ways to communicate AI detection state.
+ * HTTP API: Polling based. Supported by all "A" IP cameras.
+ * Onvif subscription: Supported on some "A" cameras. Only those on firmware `>= 3.1.0.951, april 2022`. Most of the cameras don't have this firmware available as of December 2022.
+
+For cameras on firmware `< 3.1.0.951, april 2022` you should use the `reolink` module with option `ai_detection_mode: on_motion` if using it in conjunction with `onvif` module (recommended), or `ai_detection_mode: continuous` if not using the `onvif` module. 
+
+For cameras on firmware `>= 3.1.0.951, april 2022`, if using `reolink` module you should use `ai_detection_mode: off` (default behavior).
 
 ## Licensing
 Copyright 2022 Arturo Casal

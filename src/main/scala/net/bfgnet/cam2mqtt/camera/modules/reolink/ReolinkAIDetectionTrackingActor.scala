@@ -28,7 +28,7 @@ object ReolinkAIDetectionTrackingActor extends ActorContextImplicits {
     def apply(parent: ActorRef[CameraCmd], host: ReolinkHost): Behavior[AITrackerCmd] =
         running(parent, host, Nil, first = true)
 
-    def running(parent: ActorRef[CameraCmd], host: ReolinkHost, states: List[AIDetectionState], first: Boolean = false): Behavior[AITrackerCmd] = {
+    private def running(parent: ActorRef[CameraCmd], host: ReolinkHost, states: List[AIDetectionState], first: Boolean = false): Behavior[AITrackerCmd] = {
         Behaviors.setup { implicit context =>
             val sched = context.scheduleOnce(if (first) 500.millis else 2.seconds, context.self, CheckAIState)
             Behaviors.receiveMessagePartial {
@@ -49,7 +49,7 @@ object ReolinkAIDetectionTrackingActor extends ActorContextImplicits {
         }
     }
 
-    def waitingForCommand(parent: ActorRef[CameraCmd], host: ReolinkHost, states: List[AIDetectionState]): Behavior[AITrackerCmd] = {
+    private def waitingForCommand(parent: ActorRef[CameraCmd], host: ReolinkHost, states: List[AIDetectionState]): Behavior[AITrackerCmd] = {
         Behaviors.setup { implicit context =>
             context.setReceiveTimeout(1500.millis, GotAIStateFailure(None))
             Behaviors.receiveMessagePartial {

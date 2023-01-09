@@ -23,6 +23,8 @@ application {
     mainClassName = 'net.bfgnet.cam2mqtt.App'
 }
 
+targetCompatibility = "1.8"
+
 distTar.enabled = false
 distZip.archiveName('cam2mqtt.zip')
 
