@@ -21,7 +21,8 @@ trait ReolinkCapabilityRequest extends ReolinkRequest {
             ReolinkCmd("GetRec", 1, Channel(0)),
             ReolinkCmd("GetRecV20", 1, Channel(0)),
             ReolinkCmd("GetAiState", 0, Channel(0)),
-            ReolinkCmd("GetAlarm", 1, GetAlarmCommand(GetAlarmCommandParams(0, "md")))
+            ReolinkCmd("GetAlarm", 1, GetAlarmCommand(GetAlarmCommandParams(0, "md"))),
+            ReolinkCmd("GetWhiteLed", 0, Channel(0))
         )
         for {
             cmdRes <- runGetCommands(host, cmds)
@@ -57,6 +58,7 @@ trait ReolinkCapabilityRequest extends ReolinkRequest {
             case "GetRec" => Try(parseGetRec(caps, state, result)).toOption.getOrElse((caps, state))
             case "GetRecV20" => Try(parseGetRecV20(caps, state, result)).toOption.getOrElse((caps, state))
             case "GetAiState" => Try(parseGetAiState(caps, state, result)).toOption.getOrElse((caps, state))
+            case "GetWhiteLed" => Try(parseGetWhiteLed(caps, state, result)).toOption.getOrElse((caps, state))
             case _ => (caps, state)
         }
     }
@@ -170,6 +172,19 @@ trait ReolinkCapabilityRequest extends ReolinkRequest {
                 val supported = params.dog_cat.isSupported || params.face.isSupported || params.people.isSupported ||
                     params.vehicle.isSupported
                 (caps.copy(aiDetection = supported), state.copy(aiDetectionMode = AiDetectionMode.Available, aiDetectionState = Some(params)))
+        }
+    }
+
+    private def parseGetWhiteLed(caps: ReolinkCapabilities, state: ReolinkState, result: Either[ReolinkCmdResponseError, JSONObject]): (ReolinkCapabilities, ReolinkState) = {
+        result match {
+            case Left(_) => (caps, state)
+            case Right(json) =>
+                val whiteled = json.getJSONObject("WhiteLed")
+                val params = OM.readValue(whiteled.toString, classOf[SetWhiteLedCommandParams])
+                val supported = params.state != null && params.bright != null
+                val nstate = state.copy(spotlightState = Option(params.state == 1).filter(_ => supported),
+                    spotlightBrightness = Option(params.bright).filter(_ => supported).map(_.toInt))
+                (caps.copy(spotlight = supported), nstate)
         }
     }
 

@@ -83,6 +83,8 @@ object CameraActionProtocol {
 
     case class SetIrLightsActionRequest(enabled: Boolean, override val replyTo: Option[ActorRef[CameraActionResponse]]) extends CameraActionRequest
 
+    case class SetSpotlightActionRequest(enabled: Option[Boolean], brightness: Option[Int], override val replyTo: Option[ActorRef[CameraActionResponse]]) extends CameraActionRequest
+
     // Motion record
     case class SetMotionSensActionRequest(sens: Int, override val replyTo: Option[ActorRef[CameraActionResponse]]) extends CameraActionRequest
 

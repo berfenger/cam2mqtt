@@ -26,17 +26,20 @@ object AiDetectionMode extends Enumeration {
 object ReolinkCapabilities {
     def defaultCapabilities: ReolinkCapabilities = ReolinkCapabilities(nightVision = false, irlights = false,
         motionSens = false, ftp = false, ftpV20 = false, record = false, recordV20 = false, ptzZoom = false,
-        aiDetection = false)
+        aiDetection = false, spotlight = false)
 
-    def defaultState: ReolinkState = ReolinkState(None, None, None, None, None, None, AiDetectionMode.UnSupported, None)
+    def defaultState: ReolinkState = ReolinkState(None, None, None, None, None, None, AiDetectionMode.UnSupported,
+        None, None, None)
 }
 
 case class ReolinkCapabilities(nightVision: Boolean, irlights: Boolean, motionSens: Boolean, ftp: Boolean,
-                               ftpV20: Boolean, record: Boolean, recordV20: Boolean, ptzZoom: Boolean, aiDetection: Boolean)
+                               ftpV20: Boolean, record: Boolean, recordV20: Boolean, ptzZoom: Boolean,
+                               aiDetection: Boolean, spotlight: Boolean)
 
 case class ReolinkState(nightVision: Option[NightVisionMode.Value], irlights: Option[Boolean], motionSens: Option[Int],
                         ftp: Option[Boolean], record: Option[Boolean], zoomAbsLevel: Option[Int],
-                        aiDetectionMode: AiDetectionMode.Value, aiDetectionState: Option[GetAiStateParams])
+                        aiDetectionMode: AiDetectionMode.Value, aiDetectionState: Option[GetAiStateParams],
+                        spotlightState: Option[Boolean], spotlightBrightness: Option[Int])
 
 case class ReolinkInitialState(caps: ReolinkCapabilities, state: ReolinkState)
 
@@ -53,9 +56,11 @@ object ReolinkModule extends CameraModule with MqttCameraModule with ActorContex
     private val CAM_PARAM_AI_DETECTION_MODE = "ai_detection_mode"
     private val CAM_PARAM_ZOOM_ABS = "ptz/zoom/absolute"
     private val CAM_PARAM_AIDETECTION_STATE = "aidetection"
+    private val CAM_PARAM_SPOTLIGHT_STATE = "spotlight/state"
+    private val CAM_PARAM_SPOTLIGHT_BRIGHTNESS = "spotlight/brightness"
 
     private val CAM_PARAMS = List(CAM_PARAM_NIGHTVISION, CAM_PARAM_IRLIGHTS, CAM_PARAM_MOTION_SENS, CAM_PARAM_FTP,
-        CAM_PARAM_RECORD, CAM_PARAM_ZOOM_ABS, CAM_PARAM_AI_DETECTION_MODE)
+        CAM_PARAM_RECORD, CAM_PARAM_ZOOM_ABS, CAM_PARAM_AI_DETECTION_MODE, CAM_PARAM_SPOTLIGHT_STATE, CAM_PARAM_SPOTLIGHT_BRIGHTNESS)
 
     private val NIGHVISION_VALUES = List("on", "off", "auto")
 
@@ -160,6 +165,14 @@ object ReolinkModule extends CameraModule with MqttCameraModule with ActorContex
                             updateRecordState(setup)
                         }
                     }
+                    if (cmd.caps.spotlight) {
+                        cmd.state.spotlightState.foreach {
+                            updateSpotlightState(setup)
+                        }
+                        cmd.state.spotlightBrightness.foreach {
+                            updateSpotlightBrightness(setup)
+                        }
+                    }
                     // Combine config.aiDetectionMode with detected capabilities
                     val aiDetectionModeMod = if (cmd.state.aiDetectionMode != AiDetectionMode.UnSupported) {
                         val ais = setup.config.aiDetectionMode.getOrElse(cmd.state.aiDetectionMode)
@@ -214,6 +227,10 @@ object ReolinkModule extends CameraModule with MqttCameraModule with ActorContex
                             else ReolinkRequests.setRecordV20Enabled(setup.host, mode)
                     context.pipeToSelf(a)(wrapGenericResponse(req))
                     awaitingCommandResult(setup, caps, aiDetectionTrackingActor, replyTo)
+                case CameraModuleAction(_, _, req@SetSpotlightActionRequest(enabled, brightness, replyTo)) if caps.spotlight =>
+                    val a = ReolinkRequests.setWhiteLed(setup.host, enabled = enabled, brightness = brightness)
+                    context.pipeToSelf(a)(wrapGenericResponse(req))
+                    awaitingCommandResult(setup, caps, aiDetectionTrackingActor, replyTo)
                 case CameraModuleAction(_, _, req) =>
                     req.replyTo.foreach(_ ! CameraActionResponse(Left(new IllegalArgumentException("operation not supported by camera"))))
                     Behaviors.same
@@ -264,6 +281,9 @@ object ReolinkModule extends CameraModule with MqttCameraModule with ActorContex
                                 updateFTPState(setup)(enabled)
                             case SetRecordEnabledActionRequest(enabled, _) =>
                                 updateRecordState(setup)(enabled)
+                            case SetSpotlightActionRequest(enabled, brightness, _) =>
+                                enabled.foreach(updateSpotlightState(setup))
+                                brightness.foreach(updateSpotlightBrightness(setup))
                             case _ =>
                         }
                     }
@@ -338,6 +358,16 @@ object ReolinkModule extends CameraModule with MqttCameraModule with ActorContex
                 zoomLevel.map { zl =>
                     PTZMoveActionRequest(None, Some(ZVector(zl)), isAbsolute = true, None)
                 }
+            case "spotlight" :: "state" :: Nil if ONOFF_VALUES.contains(stringData) =>
+                val nv = stringData match {
+                    case "on" => true
+                    case "off" => false
+                }
+                Some(SetSpotlightActionRequest(Option(nv), None, None))
+            case "spotlight" :: "brightness" :: Nil =>
+                Try(stringData.toInt).toOption.filter(v => v >= 0 && v <= 100).map { v =>
+                    SetSpotlightActionRequest(None, Some(v), None)
+                }
             case _ => None
         }
     }
@@ -385,6 +415,14 @@ object ReolinkModule extends CameraModule with MqttCameraModule with ActorContex
         setup.parent ! CameraModuleEvent(setup.camera.cameraId, moduleId, CameraStateBoolEvent(setup.camera.cameraId, moduleId, CAM_PARAM_RECORD, enabled))
     }
 
+    private def updateSpotlightState(setup: Setup)(enabled: Boolean): Unit = {
+        setup.parent ! CameraModuleEvent(setup.camera.cameraId, moduleId, CameraStateBoolEvent(setup.camera.cameraId, moduleId, CAM_PARAM_SPOTLIGHT_STATE, enabled))
+    }
+
+    private def updateSpotlightBrightness(setup: Setup)(brightness: Int): Unit = {
+        setup.parent ! CameraModuleEvent(setup.camera.cameraId, moduleId, CameraStateIntEvent(setup.camera.cameraId, moduleId, CAM_PARAM_SPOTLIGHT_BRIGHTNESS, brightness))
+    }
+
     private def updateAiDetectionMode(setup: Setup)(aiDetectionMode: AiDetectionMode.Value): Unit  = {
         val v = aiDetectionMode match {
             case AiDetectionMode.UnSupported => "unsupported"
@@ -426,6 +464,9 @@ object ReolinkModule extends CameraModule with MqttCameraModule with ActorContex
         }
         if (caps.aiDetection) {
             c ++= s"AI Detection: ${caps.aiDetection}\n"
+        }
+        if (caps.spotlight) {
+            c ++= s"Spotlight: ${caps.spotlight}\n"
         }
         _ac.log.info(c.toString().trim)
     }

@@ -2,9 +2,9 @@ package net.bfgnet.cam2mqtt.reolink
 
 import java.time.{ZoneId, ZoneOffset}
 import java.util.{Calendar, GregorianCalendar, TimeZone}
-
 import akka.actor.{ClassicActorSystemProvider, Scheduler}
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties
+import com.fasterxml.jackson.annotation.JsonInclude.Include
+import com.fasterxml.jackson.annotation.{JsonIgnoreProperties, JsonInclude}
 import net.bfgnet.cam2mqtt.camera.CameraActionProtocol.NightVisionMode
 import org.codehaus.jettison.json.JSONObject
 
@@ -78,6 +78,13 @@ case class GetAiObjectState(alarm_state: Int, support: Int) {
     def isSupported = support == 1
     def isDetected = alarm_state == 1
 }
+
+// SetWhiteLed
+@JsonInclude(Include.NON_NULL)
+@JsonIgnoreProperties(ignoreUnknown = true)
+case class SetWhiteLedCommandParams(state: Integer, channel: Int, mode: Integer, bright: Integer)
+
+case class SetWhiteLedCommand(WhiteLed: SetWhiteLedCommandParams) extends CommandParams
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 case class GetAiStateParams(channel: Int, dog_cat: GetAiObjectState, face: GetAiObjectState, people: GetAiObjectState, vehicle: GetAiObjectState)
@@ -283,6 +290,16 @@ trait ReolinkCommands extends ReolinkRequest {
 
     def runCommand(host: ReolinkHost, cmd: ReolinkCmd)
                   (implicit _as: ClassicActorSystemProvider, _ec: ExecutionContext): Future[ReolinkCmdResponse] = {
+        reqPost(host, Option(cmd.cmd), OM.writeValueAsString(List(cmd))).map {
+            r => parseCommandResponse(r)
+        }
+    }
+
+    def setWhiteLed(host: ReolinkHost, enabled: Option[Boolean] = None, brightness: Option[Int] = None)
+                           (implicit _as: ClassicActorSystemProvider, _ec: ExecutionContext): Future[ReolinkCmdResponse] = {
+        val p = SetWhiteLedCommandParams(enabled.map(v => if (v) 1 else 0).map(_.asInstanceOf[Integer]).orNull, 0, null,
+            brightness.filter(v => v >= 0 && v <= 100).map(_.asInstanceOf[Integer]).orNull)
+        val cmd = ReolinkCmd("SetWhiteLed", 0, SetWhiteLedCommand(p))
         reqPost(host, Option(cmd.cmd), OM.writeValueAsString(List(cmd))).map {
             r => parseCommandResponse(r)
         }
