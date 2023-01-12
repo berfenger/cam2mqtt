@@ -406,7 +406,7 @@ object ReolinkModule extends CameraModule with MqttCameraModule with ActorContex
                 }
                 Some(PlayAlarmActionRequest(nv, None, None))
             case "alarm" :: "play" :: Nil =>
-                Try(stringData.toInt).toOption.filter(v => v >= 0 && v <= 100).map { v =>
+                Try(stringData.toInt).toOption.filter(v => v >= 1 && v <= 100).map { v =>
                     PlayAlarmActionRequest(play = true, Some(v), None)
                 }
             case _ => None
