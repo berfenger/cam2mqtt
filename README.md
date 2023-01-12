@@ -32,6 +32,9 @@ For now only two modules are implemented:
     * Sync date time
     * Enable/disable Record (V1 & V2)
     * Enable/disable FTP (V1 & V2)
+    * Turn on/off spotlight
+    * Change audio volume
+    * Play alarm
   * AI powered object detection
     * Person detection
     * Vehicle detection
@@ -75,6 +78,7 @@ Feel free to try other cameras and let me know if it works so I can update this 
     cam2mqtt/camera/{cameraId}/state/reolink/record on/off
     cam2mqtt/camera/{cameraId}/state/reolink/ftp on/off
     cam2mqtt/camera/{cameraId}/state/reolink/ai_detection_mode on_motion
+    cam2mqtt/camera/{cameraId}/state/reolink/audio/volume 0-100
 
 ##### Commands
     cam2mqtt/camera/{cameraId}/command/reolink/nightvision auto/on/off
@@ -84,6 +88,8 @@ Feel free to try other cameras and let me know if it works so I can update this 
     cam2mqtt/camera/{cameraId}/command/reolink/ptz/zoom/absolute 0-100
     cam2mqtt/camera/{cameraId}/command/reolink/record on/off
     cam2mqtt/camera/{cameraId}/command/reolink/ftp on/off
+    cam2mqtt/camera/{cameraId}/command/reolink/audio/volume 0-100
+    cam2mqtt/camera/{cameraId}/command/reolink/alarm/play on/off/1-100
 
 ##### Motion events (AI detection)
     cam2mqtt/camera/{cameraId}/event/reolink/aidetection/people/detected on/off
