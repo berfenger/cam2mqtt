@@ -15,7 +15,7 @@ Global / excludeLintKeys += idePackagePrefix
 val AkkaVersion = "2.6.20"
 val AkkaHttpVersion = "10.2.9"
 libraryDependencies ++= Seq(
-    "junit" % "junit" % "4.12",
+    "org.scalatest" %% "scalatest" % "3.2.15" % Test,
     "com.typesafe.akka" %% "akka-actor-typed" % AkkaVersion,
     "com.typesafe.akka" %% "akka-stream" % AkkaVersion,
     "com.typesafe.akka" %% "akka-http" % AkkaHttpVersion,
