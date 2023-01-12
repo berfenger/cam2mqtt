@@ -329,7 +329,7 @@ trait ReolinkCommands extends ReolinkRequest {
                    (implicit _as: ClassicActorSystemProvider, _ec: ExecutionContext): Future[ReolinkCmdResponse] = {
         val params = times match {
             case Some(times) if play => AudioAlarmPlayCommand("times", 0, times, null)
-            case None => AudioAlarmPlayCommand("manul", 0, null, if (play) 1 else 0)
+            case _ => AudioAlarmPlayCommand("manul", 0, null, if (play) 1 else 0)
         }
         val cmd = ReolinkCmd("AudioAlarmPlay", 0, params)
         reqPost(host, Option(cmd.cmd), OM.writeValueAsString(List(cmd))).map {
