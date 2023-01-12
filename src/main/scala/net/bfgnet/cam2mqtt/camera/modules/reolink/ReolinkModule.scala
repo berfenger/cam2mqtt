@@ -330,22 +330,23 @@ object ReolinkModule extends CameraModule with MqttCameraModule with ActorContex
     }
 
     override def loadConfiguration(from: Map[String, Any]): CameraModuleConfig = {
-        val syncDateTime = from.get("sync_datetime").filter(_ != null).map(_.toString).contains("true")
-        val port = from.get("port").filter(_ != null).flatMap(v => Try(v.toString.toInt).toOption)
-        val ssl = from.get("ssl").filter(_ != null).map(_.toString).filter(v => v == "true" || v == "false").map(v => if (v == "true") true else false)
-        val username = from.get("username").filter(_ != null).map(_.toString).filter(_.nonEmpty)
-        val password = from.get("password").filter(_ != null).map(_.toString).filter(_.nonEmpty)
-        val aiDetectionMode = from.get("ai_detection_mode").filter(_ != null).map(_.toString).filter(_.nonEmpty).map(_.toLowerCase()) match {
+        import net.bfgnet.cam2mqtt.utils.ConfigParserUtils._
+        val syncDateTime = from.getBool("sync_datetime")
+        val port = from.getInt("port")
+        val ssl = from.getBool("ssl")
+        val username = from.getString("username")
+        val password = from.getString("password")
+        val aiDetectionMode = from.getString("ai_detection_mode").map(_.toLowerCase()) match {
             case Some("off") | Some("onvif") | Some("available") => Some(AiDetectionMode.Available)
             case Some("on_motion") => Some(AiDetectionMode.OnMotion)
             case Some("continuous") => Some(AiDetectionMode.Continuous)
             case _ => None
         }
-        val audio = from.get("audio").filter(_ != null).map(_.toString).filter(v => v == "true" || v == "false").map(v => if (v == "true") true else false)
-        val alarm = from.get("alarm").filter(_ != null).map(_.toString).filter(v => v == "true" || v == "false").map(v => if (v == "true") true else false)
-        val spotlight = from.get("spotlight").filter(_ != null).map(_.toString).filter(v => v == "true" || v == "false").map(v => if (v == "true") true else false)
-        ReolinkCameraModuleConfig(port, ssl, username, password, syncDateTime, aiDetectionMode,
-            spotlight.getOrElse(false), audio.getOrElse(false), alarm.getOrElse(false))
+        val audio = from.getBool("audio")
+        val alarm = from.getBool("alarm")
+        val spotlight = from.getBool("spotlight")
+        ReolinkCameraModuleConfig(port, ssl, username, password, syncDateTime.orFalse, aiDetectionMode,
+            spotlight.orFalse, audio.orFalse, alarm.orFalse)
     }
 
     override def parseMQTTCommand(path: List[String], stringData: String): Option[CameraActionProtocol.CameraActionRequest] = {

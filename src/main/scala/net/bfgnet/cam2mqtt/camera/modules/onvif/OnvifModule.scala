@@ -113,10 +113,11 @@ object OnvifModule extends CameraModule with MqttCameraModule with ActorContextI
     }
 
     override def loadConfiguration(from: Map[String, Any]): CameraModuleConfig = {
-        val port = Try(from.get("port").filter(_ != null).map(_.toString.toInt)).toOption.flatten.getOrElse(8000)
-        val monitorEvs = from.get("monitor_events").filter(_ != null).map(_.toString).contains("true")
-        val preferWebhook = from.get("prefer_webhook_subscription").filter(_ != null).map(_.toString).contains("true")
-        OnvifCameraModuleConfig(port, monitorEvs, preferWebhook)
+        import net.bfgnet.cam2mqtt.utils.ConfigParserUtils._
+        val port = from.getInt("port").getOrElse(8000)
+        val monitorEvs = from.getBool("monitor_events")
+        val preferWebhook = from.getBool("prefer_webhook_subscription")
+        OnvifCameraModuleConfig(port, monitorEvs.orFalse, preferWebhook.orFalse)
     }
 
     override def parseMQTTCommand(path: List[String], stringData: String): Option[CameraActionProtocol.CameraActionRequest] = None
