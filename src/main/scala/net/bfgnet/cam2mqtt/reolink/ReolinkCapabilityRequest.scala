@@ -22,7 +22,8 @@ trait ReolinkCapabilityRequest extends ReolinkRequest {
             ReolinkCmd("GetRecV20", 1, Channel(0)),
             ReolinkCmd("GetAiState", 0, Channel(0)),
             ReolinkCmd("GetAlarm", 1, GetAlarmCommand(GetAlarmCommandParams(0, "md"))),
-            ReolinkCmd("GetWhiteLed", 0, Channel(0))
+            ReolinkCmd("GetWhiteLed", 0, Channel(0)),
+            ReolinkCmd("GetAudioCfg", 0, Channel(0))
         )
         for {
             cmdRes <- runGetCommands(host, cmds)
@@ -59,6 +60,7 @@ trait ReolinkCapabilityRequest extends ReolinkRequest {
             case "GetRecV20" => Try(parseGetRecV20(caps, state, result)).toOption.getOrElse((caps, state))
             case "GetAiState" => Try(parseGetAiState(caps, state, result)).toOption.getOrElse((caps, state))
             case "GetWhiteLed" => Try(parseGetWhiteLed(caps, state, result)).toOption.getOrElse((caps, state))
+            case "GetAudioCfg" => Try(parseGetAudioCfg(caps, state, result)).toOption.getOrElse((caps, state))
             case _ => (caps, state)
         }
     }
@@ -170,7 +172,7 @@ trait ReolinkCapabilityRequest extends ReolinkRequest {
             case Right(json) =>
                 val params = OM.readValue(json.toString, classOf[GetAiStateParams])
                 val supported = params.dog_cat.isSupported || params.face.isSupported || params.people.isSupported ||
-                    params.vehicle.isSupported
+                        params.vehicle.isSupported
                 (caps.copy(aiDetection = supported), state.copy(aiDetectionMode = AiDetectionMode.Available, aiDetectionState = Some(params)))
         }
     }
@@ -185,6 +187,16 @@ trait ReolinkCapabilityRequest extends ReolinkRequest {
                 val nstate = state.copy(spotlightState = Option(params.state == 1).filter(_ => supported),
                     spotlightBrightness = Option(params.bright).filter(_ => supported).map(_.toInt))
                 (caps.copy(spotlight = supported), nstate)
+        }
+    }
+
+    private def parseGetAudioCfg(caps: ReolinkCapabilities, state: ReolinkState, result: Either[ReolinkCmdResponseError, JSONObject]): (ReolinkCapabilities, ReolinkState) = {
+        result match {
+            case Left(_) => (caps, state)
+            case Right(json) =>
+                val audioCfg = json.getJSONObject("AudioCfg")
+                val params = OM.readValue(audioCfg.toString, classOf[SetAudioCfgCommandParams])
+                (caps.copy(audio = params != null), state.copy(audioVolume = Option(params.volume)))
         }
     }
 

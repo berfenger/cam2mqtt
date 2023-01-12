@@ -86,6 +86,17 @@ case class SetWhiteLedCommandParams(state: Integer, channel: Int, mode: Integer,
 
 case class SetWhiteLedCommand(WhiteLed: SetWhiteLedCommandParams) extends CommandParams
 
+// AudioAlarmPlay
+@JsonInclude(Include.NON_NULL)
+@JsonIgnoreProperties(ignoreUnknown = true)
+case class AudioAlarmPlayCommand(alarm_mode: String, channel: Int, times: Integer, manual_switch: Integer) extends CommandParams
+
+// SetAudioCfg
+@JsonIgnoreProperties(ignoreUnknown = true)
+case class SetAudioCfgCommandParams(channel: Int, volume: Int)
+
+case class SetAudioCfgCommand(AudioCfg: SetAudioCfgCommandParams) extends CommandParams
+
 @JsonIgnoreProperties(ignoreUnknown = true)
 case class GetAiStateParams(channel: Int, dog_cat: GetAiObjectState, face: GetAiObjectState, people: GetAiObjectState, vehicle: GetAiObjectState)
 
@@ -305,7 +316,28 @@ trait ReolinkCommands extends ReolinkRequest {
         }
     }
 
-    def postpone[T](duration: FiniteDuration)(code: => Future[T])(implicit _ec: ExecutionContext, _sch: Scheduler): Future[T] = {
+    def setAudioCfg(host: ReolinkHost, volume: Int)
+                   (implicit _as: ClassicActorSystemProvider, _ec: ExecutionContext): Future[ReolinkCmdResponse] = {
+        val p = SetAudioCfgCommandParams(0, volume)
+        val cmd = ReolinkCmd("SetAudioCfg", 0, SetAudioCfgCommand(p))
+        reqPost(host, Option(cmd.cmd), OM.writeValueAsString(List(cmd))).map {
+            r => parseCommandResponse(r)
+        }
+    }
+
+    def setAudioAlarmPlay(host: ReolinkHost, play: Boolean, times: Option[Int])
+                   (implicit _as: ClassicActorSystemProvider, _ec: ExecutionContext): Future[ReolinkCmdResponse] = {
+        val params = times match {
+            case Some(times) if play => AudioAlarmPlayCommand("times", 0, times, null)
+            case None => AudioAlarmPlayCommand("manul", 0, null, if (play) 1 else 0)
+        }
+        val cmd = ReolinkCmd("AudioAlarmPlay", 0, params)
+        reqPost(host, Option(cmd.cmd), OM.writeValueAsString(List(cmd))).map {
+            r => parseCommandResponse(r)
+        }
+    }
+
+    private def postpone[T](duration: FiniteDuration)(code: => Future[T])(implicit _ec: ExecutionContext, _sch: Scheduler): Future[T] = {
         val p = Promise[T]()
         _sch.scheduleOnce(duration) {
             code.onComplete(p.tryComplete)

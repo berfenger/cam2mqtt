@@ -74,7 +74,7 @@ object CameraActionProtocol {
     // PTZ Move
     case class PTZMoveActionRequest(pt: Option[PTVector], z: Option[ZVector], isAbsolute: Boolean, override val replyTo: Option[ActorRef[CameraActionResponse]]) extends CameraActionRequest
 
-    // Night vision
+    // Light control
     object NightVisionMode extends Enumeration {
         val ForceOn, ForceOff, Auto = Value
     }
@@ -91,6 +91,11 @@ object CameraActionProtocol {
     case class SetFTPEnabledActionRequest(enabled: Boolean, override val replyTo: Option[ActorRef[CameraActionResponse]]) extends CameraActionRequest
 
     case class SetRecordEnabledActionRequest(enabled: Boolean, override val replyTo: Option[ActorRef[CameraActionResponse]]) extends CameraActionRequest
+
+    // Audio
+    case class SetAudioVolumeActionRequest(volume: Int, override val replyTo: Option[ActorRef[CameraActionResponse]]) extends CameraActionRequest
+
+    case class PlayAlarmActionRequest(play: Boolean, times: Option[Int], override val replyTo: Option[ActorRef[CameraActionResponse]]) extends CameraActionRequest
 
 }
 
@@ -116,7 +121,8 @@ object CameraConfig {
 
     case class ReolinkCameraModuleConfig(port: Option[Int], useSSL: Option[Boolean],
                                          altUsername: Option[String], altPassword: Option[String],
-                                         syncDateTime: Boolean, aiDetectionMode: Option[AiDetectionMode.Value]) extends CameraModuleConfig {
+                                         syncDateTime: Boolean, aiDetectionMode: Option[AiDetectionMode.Value],
+                                         enableSpotlight: Boolean, enableAudio: Boolean, enableAlarm: Boolean) extends CameraModuleConfig {
         override val moduleId: String = ReolinkModule.moduleId
 
         override type ModConf = ReolinkCameraModuleConfig
