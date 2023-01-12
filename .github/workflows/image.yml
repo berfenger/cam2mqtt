@@ -17,19 +17,23 @@ jobs:
         with:
           distribution: zulu
           java-version: 8
-      # install SBT
-      - run: apt-get update -y
-      - run: apt-get install apt-transport-https curl gnupg -yqq
-      - run: echo "deb https://repo.scala-sbt.org/scalasbt/debian all main" | tee /etc/apt/sources.list.d/sbt.list
-      - run: echo "deb https://repo.scala-sbt.org/scalasbt/debian /" | tee /etc/apt/sources.list.d/sbt_old.list
-      - run: curl -sL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x2EE0EA64E40A89B84B2DF73499E82A75642AC823" | gpg --no-default-keyring --keyring gnupg-ring:/etc/apt/trusted.gpg.d/scalasbt-release.gpg --import
-      - run: chmod 644 /etc/apt/trusted.gpg.d/scalasbt-release.gpg
-      - run: apt-get update
-      - run: apt-get install -y sbt
-      # build with SBT
-      - run: sbt compile universal:packageBin
-      - run: pwd
-      - run: ls target/universal
+
+      - name: Install SBT
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install apt-transport-https curl gnupg -yqq
+          echo "deb https://repo.scala-sbt.org/scalasbt/debian all main" | sudo tee /etc/apt/sources.list.d/sbt.list
+          echo "deb https://repo.scala-sbt.org/scalasbt/debian /" | sudo tee /etc/apt/sources.list.d/sbt_old.list
+          curl -sL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x2EE0EA64E40A89B84B2DF73499E82A75642AC823" | sudo gpg --no-default-keyring --keyring gnupg-ring:/etc/apt/trusted.gpg.d/scalasbt-release.gpg --import
+          sudo chmod 644 /etc/apt/trusted.gpg.d/scalasbt-release.gpg
+          sudo apt-get update
+          sudo apt-get install -y sbt
+
+      - name: Build with SBT
+        run: |
+          sbt compile universal:packageBin
+          pwd
+          ls target/universal
 
       -
         name: Set up QEMU
