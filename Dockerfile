@@ -4,9 +4,7 @@ RUN apk add --no-cache tzdata ca-certificates bash
 
 SHELL ["/bin/bash", "-c"]
 
-ARG TARGETARCH
-
-RUN echo $TARGETARCH
+RUN echo $TARGETARCH $TARGETPLATFORM
 
 RUN \
     if [ "$TARGETARCH" = "linux/arm/v7" ]; then \
