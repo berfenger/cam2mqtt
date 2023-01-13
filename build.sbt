@@ -8,7 +8,7 @@ lazy val root = (project in file("."))
     idePackagePrefix := Some("net.bfgnet.cam2mqtt")
   )
 
-enablePlugins(JavaAppPackaging)
+enablePlugins(JavaAppPackaging, AshScriptPlugin)
 
 Global / excludeLintKeys += idePackagePrefix
 
@@ -30,3 +30,7 @@ libraryDependencies ++= Seq(
     "io.circe" %% "circe-yaml" % "0.13.1",
 )
 
+// add ability to define JVM options by "CAM2MQTT_OPTS" env variable
+bashScriptExtraDefines += """if [[ "$CAM2MQTT_OPTS" != "" ]]; then
+                            |  addJava "${CAM2MQTT_OPTS}"
+                            |fi""".stripMargin

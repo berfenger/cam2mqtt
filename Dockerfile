@@ -15,7 +15,8 @@ RUN \
         apk add --no-cache openjdk11-jre; \
     fi
 
-ADD ./target/universal/stage /opt/app
+ADD ./target/universal/stage/bin /opt/app/bin
+ADD ./target/universal/stage/lib /opt/app/lib
 
 WORKDIR /opt/app
 
