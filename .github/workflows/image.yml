@@ -67,8 +67,8 @@ jobs:
       - name: "Docker tags and labels"
         run: |
           echo EVENT NAME: ${{ github.event_name }}
-          echo OUTS: ${{join(steps.vars.outputs.*, '; ')}}
-          echo TAGS: ${{join(steps.meta.outputs.tags, '; ')}}
+          echo OUTS: ${{ steps.vars.outputs.* }}
+          echo TAGS: ${{ steps.meta.outputs.tags }}
           echo LABELS: ${{ steps.meta.outputs.labels }}
 
       -
