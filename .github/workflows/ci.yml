@@ -2,10 +2,10 @@ name: ci
 
 on:
   push:
-    branches: master
+    branches: feature/sbt
     tag: 'v*'
   pull_request:
-    branches: master
+    branches: feature/sbt
 
 jobs:
   ci:
@@ -61,8 +61,8 @@ jobs:
           tags: |
             type=edge,branch=master
             type=semver,pattern={{version}}
+            type=raw,value=sbt,enable=true,priority=600,prefix=,suffix=
           images: |
-            acasal/cam2mqtt
             ghcr.io/${{ github.repository }}
       -
         name: Build and push
