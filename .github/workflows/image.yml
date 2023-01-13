@@ -68,9 +68,8 @@ jobs:
         run: |
           echo EVENT NAME: ${{ github.event_name }}
           echo OUTS: ${{ steps.vars.outputs.tag }} ${{ steps.vars.outputs.istag }}
-          echo TAGS: ${{ steps.meta.outputs.tags }}
-          echo LABELS: ${{ steps.meta.outputs.labels }}
-          echo OK
+          echo TAGS: ${{join(steps.meta.outputs.tags, ', ')}}
+          echo LABELS: ${{join(steps.meta.outputs.labels, ', ')}}
 
       -
         name: Build and push
