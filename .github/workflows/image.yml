@@ -3,12 +3,13 @@ name: ci
 on:
   push:
     branches: feature/sbt
+    tag: 'v*.*.*'
   pull_request:
     branches: feature/sbt
 
 jobs:
   main:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       -
         uses: actions/checkout@v3
@@ -35,6 +36,11 @@ jobs:
           pwd
           ls target/universal
 
+      - name: Set output
+        id: vars
+        run: |
+          echo "tag=${GITHUB_REF#refs/*/}" >> $GITHUB_OUTPUT
+          if [[ "$GITHUB_REF" == *"tags"* ]]; then echo "istag=true"; else echo "istag=false"; fi
       -
         name: Set up QEMU
         uses: docker/setup-qemu-action@v2
@@ -48,6 +54,25 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USER }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          tags: |
+            type=edge,branch=master
+            type=ref,enable=true,priority=200,prefix=,suffix=,event=tag
+            type=raw,value=sbt,enable=true,priority=600,prefix=,suffix=,event=tag
+          images: |
+            ghcr.io/${{ github.repository }}    
+
+      - name: "Docker tags and labels"
+        run: |
+          echo EVENT NAME: ${{ github.event_name }}
+          echo ${{join(steps.vars.outputs.*, '; ')}}
+          echo ${{join(steps.meta.outputs.tags, '; ')}}
+          echo ${{join(steps.meta.outputs.labels, '; ')}}
+
       -
         name: Build and push
         id: docker_build
@@ -56,7 +81,8 @@ jobs:
           context: .
           push: ${{ github.event_name == 'push' }}
           platforms: linux/amd64,linux/arm64,linux/arm/v7
-          tags: acasal/cam2mqtt:sbt
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
       -
         name: Image digest
         run: echo ${{ steps.docker_build.outputs.digest }}
