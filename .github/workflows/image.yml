@@ -33,14 +33,12 @@ jobs:
       - name: Build with SBT
         run: |
           sbt compile universal:packageBin
-          pwd
-          ls target/universal
 
       - name: Set output
         id: vars
         run: |
           echo "tag=${GITHUB_REF#refs/*/}" >> $GITHUB_OUTPUT
-          if [[ "$GITHUB_REF" == *"tags"* ]]; then echo "istag=true"; else echo "istag=false"; fi
+          if [[ "$GITHUB_REF" == *"tags"* ]]; then echo "istag=true" >> $GITHUB_OUTPUT; else echo "istag=false" >> $GITHUB_OUTPUT; fi
       -
         name: Set up QEMU
         uses: docker/setup-qemu-action@v2
@@ -69,9 +67,9 @@ jobs:
       - name: "Docker tags and labels"
         run: |
           echo EVENT NAME: ${{ github.event_name }}
-          echo ${{join(steps.vars.outputs.*, '; ')}}
-          echo ${{join(steps.meta.outputs.tags, '; ')}}
-          echo ${{join(steps.meta.outputs.labels, '; ')}}
+          echo OUTS: ${{join(steps.vars.outputs.*, '; ')}}
+          echo TAGS: ${{join(steps.meta.outputs.tags, '; ')}}
+          echo LABELS: ${{ steps.meta.outputs.labels }}
 
       -
         name: Build and push
