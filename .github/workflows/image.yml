@@ -32,7 +32,7 @@ jobs:
 
       - name: Build with SBT
         run: |
-          sbt compile universal:packageBin
+          sbt compile stage
 
       - name: Set output
         id: vars
