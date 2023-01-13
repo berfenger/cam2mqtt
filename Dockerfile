@@ -1,20 +1,24 @@
 FROM alpine:3.15.1
 
-RUN apk add --no-cache unzip
+RUN apk add --no-cache tzdata ca-certificates bash
 
-ADD . /app_src
+SHELL ["/bin/bash", "-c"]
 
-WORKDIR /usr/src/app
+ARG TARGETPLATFORM
 
-RUN unzip /app_src/build/distributions/cam2mqtt.zip
+RUN echo ARCH DBG: $TARGETARCH $TARGETPLATFORM
 
-FROM alpine:3.15.1
+RUN \
+    if [ "$TARGETPLATFORM" = "linux/arm/v7" ]; then \
+        apk add --no-cache openjdk8-jre; \
+    else \
+        apk add --no-cache openjdk11-jre; \
+    fi
 
-RUN apk add --no-cache openjdk8-jre tzdata ca-certificates
+ADD ./target/universal/stage/bin /opt/app/bin
+ADD ./target/universal/stage/lib /opt/app/lib
 
-COPY --from=0 /usr/src/app /usr/src/app
-
-WORKDIR /usr/src/app/cam2mqtt
+WORKDIR /opt/app
 
 ENV HTTP_PORT=8080
 ENV CONFIG=/config.yml

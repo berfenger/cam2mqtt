@@ -27,6 +27,9 @@ cameras:
         # ssl: false # optional. Use ssl/HTTPS
         ai_detection_mode: off # one of [off, on_motion, continuous]. on_motion requires onvif module to detect motion
         sync_datetime: false
+        # audio: false # allow to control audio alarm volume (can't be autodetected)
+        # alarm: false # allow to control alarm siren (can't be autodetected)
+        # spotlight: false # allow to control spotlight (can't be autodetected)
   onvif_cam_1:
     host: 192.168.4.2
     username: admin
