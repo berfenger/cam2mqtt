@@ -4,10 +4,12 @@ RUN apk add --no-cache tzdata ca-certificates bash
 
 SHELL ["/bin/bash", "-c"]
 
-RUN echo $TARGETARCH $TARGETPLATFORM
+ARG TARGETPLATFORM
+
+RUN echo ARCH DBG: $TARGETARCH $TARGETPLATFORM
 
 RUN \
-    if [ "$TARGETARCH" = "linux/arm/v7" ]; then \
+    if [ "$TARGETPLATFORM" = "linux/arm/v7" ]; then \
         apk add --no-cache openjdk8-jre; \
     else \
         apk add --no-cache openjdk11-jre; \
