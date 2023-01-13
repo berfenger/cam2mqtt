@@ -1,8 +1,8 @@
 FROM alpine:3.15.1
 
-SHELL ["/bin/bash", "-c"]
-
 RUN apk add --no-cache tzdata ca-certificates bash
+
+SHELL ["/bin/bash", "-c"]
 
 RUN \
     if [ "$TARGETARCH" = "linux/arm/v7" ]; then \
