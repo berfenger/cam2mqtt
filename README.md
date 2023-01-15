@@ -108,7 +108,7 @@ For cameras on firmware `< 3.1.0.951, april 2022` you should use the `reolink` m
 For cameras on firmware `>= 3.1.0.951, april 2022`, if using `reolink` module you should use `ai_detection_mode: off` (default behavior).
 
 ## Licensing
-Copyright 2022 Arturo Casal
+Copyright 2023 Arturo Casal
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.

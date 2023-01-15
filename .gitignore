@@ -3,4 +3,7 @@ out/
 .gradle/
 .idea/
 src/test
+target/
+project/target
+project/project/target
 config.dev.yml

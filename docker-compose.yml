@@ -1,4 +1,4 @@
-version: '3.4'
+version: '2.4'
 
 services:
   cam2mqtt:
@@ -11,3 +11,4 @@ services:
     environment:
       # this will be the camera timezone when the camera type is updated by reolink module (reolink.sync_datetime = true)
       - TZ=Europe/Paris
+      #- CAM2MQTT_OPTS="-Dlogback.configurationFile=logback-debug.xml"
