@@ -1,22 +1,24 @@
 package net.bfgnet.cam2mqtt
 package camera.modules.onvif
 
-import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
-import akka.actor.typed.{ActorRef, Behavior, PostStop, Terminated}
-import akka.stream.alpakka.mqtt.MqttMessage
-import akka.util.ByteString
 import camera.CameraActionProtocol
 import camera.CameraConfig.{CameraInfo, CameraModuleConfig, OnvifCameraModuleConfig}
 import camera.CameraProtocol._
-import camera.modules.{CameraModule, MqttCameraModule}
 import camera.modules.onvif.OnvifSubProtocol.{OnvifSubCmd, TerminateSubscription, WebhookNotification}
+import camera.modules.{CameraModule, MqttCameraModule}
 import config.ConfigManager
+import eventbus.CameraEventBus
 import onvif.OnvifGetPropertiesRequests.OnvifCapabilitiesResponse
 import onvif.OnvifRequests
 import utils.ActorContextImplicits
 
+import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
+import akka.actor.typed.{ActorRef, Behavior, PostStop, Terminated}
+import akka.stream.alpakka.mqtt.MqttMessage
+import akka.util.ByteString
+
 import scala.collection.mutable
-import scala.util.{Failure, Success, Try}
+import scala.util.{Failure, Success}
 
 sealed trait OnvifModuleCmd
 
@@ -33,9 +35,7 @@ object OnvifModule extends CameraModule with MqttCameraModule with ActorContextI
     private def stopped(parent: ActorRef[CameraCmd], camera: CameraInfo,
                         config: OnvifCameraModuleConfig): Behavior[CameraCmd] = {
         Behaviors.setup[CameraCmd] { implicit context =>
-
             getOnvifCapabilities(camera, config)
-
             Behaviors.receiveMessagePartial[CameraCmd] {
                 case WrappedModuleCmd(oc@OnvifCapabilities(cap)) =>
                     logCapabilities(camera.cameraId, cap)
@@ -54,7 +54,7 @@ object OnvifModule extends CameraModule with MqttCameraModule with ActorContextI
                         context.watch(a)
                         a
                     }
-                    started(parent, subActor)
+                    started(parent, camera, config, subActor, motion = false)
                 case WrappedModuleCmd(OnvifError(err)) =>
                     throw err
                 case TerminateCam =>
@@ -63,35 +63,44 @@ object OnvifModule extends CameraModule with MqttCameraModule with ActorContextI
         }
     }
 
-    private def started(parent: ActorRef[CameraCmd],
-                        subscriptionActor: Option[ActorRef[OnvifSubCmd]]): Behavior[CameraCmd] = {
-        Behaviors.setup[CameraCmd] { implicit context =>
-
-            Behaviors.receiveMessagePartial[CameraCmd] {
-                // webhook notification
-                case CameraModuleMessage(_, _, msg) =>
-                    subscriptionActor.foreach(_ ! WebhookNotification(msg))
-                    Behaviors.same
-                // Event from subscription
-                case ev: CameraModuleEvent =>
+    private def started(parent: ActorRef[CameraCmd], camera: CameraInfo, config: OnvifCameraModuleConfig,
+                        subscriptionActor: Option[ActorRef[OnvifSubCmd]], motion: Boolean): Behavior[CameraCmd] = {
+        Behaviors.receiveMessagePartial[CameraCmd] {
+            // webhook notification
+            case CameraModuleMessage(_, _, msg) =>
+                subscriptionActor.foreach(_ ! WebhookNotification(msg))
+                Behaviors.same
+            // Event from subscription
+            case ev@CameraModuleEvent(_, _, CameraMotionEvent(_, _, evMotion)) =>
+                val updateMotion = (motion != evMotion) || !config.debounceMotion
+                if (updateMotion) {
                     parent ! ev
+                    started(parent, camera, config, subscriptionActor, evMotion)
+                } else {
                     Behaviors.same
-                case WrappedModuleCmd(OnvifError(err)) =>
-                    throw err
-                case TerminateCam =>
-                    subscriptionActor match {
-                        case Some(s) =>
-                            s ! TerminateSubscription
-                            finishing(List(s))
-                        case None =>
-                            Behaviors.stopped
-                    }
-            }.receiveSignal {
-                case (_, Terminated(actor)) =>
-                    throw new Exception(s"subscription actor [$actor] failed")
-                case (_, PostStop) =>
-                    Behaviors.same
-            }
+                }
+            case ev: CameraModuleEvent =>
+                parent ! ev
+                Behaviors.same
+            case WrappedModuleCmd(OnvifError(err)) =>
+                throw err
+            case TerminateCam =>
+                // if motion, publish default state
+                if (motion) {
+                    CameraEventBus.bus.publish(CameraMotionEvent(camera.cameraId, OnvifModule.moduleId, motion = false))
+                }
+                subscriptionActor match {
+                    case Some(s) =>
+                        s ! TerminateSubscription
+                        finishing(List(s))
+                    case None =>
+                        Behaviors.stopped
+                }
+        }.receiveSignal {
+            case (_, Terminated(actor)) =>
+                throw new Exception(s"subscription actor [$actor] failed")
+            case (_, PostStop) =>
+                Behaviors.same
         }
     }
 
@@ -118,7 +127,8 @@ object OnvifModule extends CameraModule with MqttCameraModule with ActorContextI
         val port = from.getInt("port").getOrElse(8000)
         val monitorEvs = from.getBool("monitor_events")
         val preferWebhook = from.getBool("prefer_webhook_subscription")
-        OnvifCameraModuleConfig(port, monitorEvs.orFalse, preferWebhook.orFalse)
+        val debounceMotion = from.getBool("motion_debounce").orTrue
+        OnvifCameraModuleConfig(port, monitorEvs.orFalse, preferWebhook.orFalse, debounceMotion)
     }
 
     override def parseMQTTCommand(path: List[String], stringData: String): Option[CameraActionProtocol.CameraActionRequest] = None

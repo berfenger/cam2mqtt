@@ -1,29 +1,28 @@
 package net.bfgnet.cam2mqtt
 package mqtt
 
-import akka.Done
-import akka.actor.ActorRef
-import akka.actor.typed.{ActorRef => TypedActorRef}
-import akka.actor.typed.scaladsl.Behaviors
-import akka.actor.typed.scaladsl.adapter._
-import akka.actor.typed.{Behavior, SupervisorStrategy}
-import akka.stream.alpakka.mqtt.scaladsl.{MqttFlow, MqttMessageWithAck}
-import akka.stream.alpakka.mqtt.{MqttConnectionSettings, MqttMessage, MqttQoS, MqttSubscriptions}
-import akka.stream.scaladsl.{Flow, Keep, RunnableGraph, Sink, Source}
-import akka.stream.{ActorAttributes, CompletionStrategy, OverflowStrategy, Supervision}
-
-import javax.net.ssl.SSLContext
-import camera.CameraProtocol.{CameraAvailableEvent, CameraEvent}
+import camera.CameraProtocol.CameraEvent
 import camera.modules.CameraModules
-import config.{ConfigManager, MqttConfig}
+import config.MqttConfig
 import eventbus.CameraEventBus
 import mqtt.MqttProtocol._
 import system.{O2MCommand, WrappedMqttConnectionCmd}
 import utils.ActorContextImplicits
+
+import akka.Done
+import akka.actor.ActorRef
+import akka.actor.typed.scaladsl.Behaviors
+import akka.actor.typed.scaladsl.adapter._
+import akka.actor.typed.{Behavior, SupervisorStrategy, ActorRef => TypedActorRef}
+import akka.stream.alpakka.mqtt.scaladsl.{MqttFlow, MqttMessageWithAck}
+import akka.stream.alpakka.mqtt.{MqttConnectionSettings, MqttMessage, MqttQoS, MqttSubscriptions}
+import akka.stream.scaladsl.{Flow, Keep, RunnableGraph, Sink, Source}
+import akka.stream.{ActorAttributes, CompletionStrategy, OverflowStrategy, Supervision}
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence
 
+import javax.net.ssl.SSLContext
+import scala.concurrent.Future
 import scala.concurrent.duration._
-import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 
 case class MqttBaseTopicProvider(base: String)
@@ -106,48 +105,13 @@ object MqttSystem extends ActorContextImplicits {
                     throw err
                 case Terminate =>
                     CameraEventBus.bus.unsubscribe(eventBusListener)
-                    sendingOffline(mqttStream)
+                    mqttStream ! Terminate
+                    terminatingOk()
                 case TerminatedOk =>
                     Behaviors.same
             }
         }
     }
-
-    private def sendingOffline(mqttStream: ActorRef): Behavior[MqttCmd] =
-        Behaviors.setup { context =>
-            implicit val _ec: ExecutionContext = context.executionContext
-            context.scheduleOnce(5.seconds, context.self, TerminatedOk)
-            val camIds = ConfigManager.cameras.map(_.cameraId)
-            camIds.foreach { id =>
-                mqttStream ! CameraEventReceived(CameraAvailableEvent(id, available = false), Option(() => Future {
-                    context.self ! CamFinished(id)
-                    Done
-                }))
-            }
-            sendingOffline(mqttStream, camIds)
-        }
-
-    private def sendingOffline(mqttStream: ActorRef, remaining: List[String]): Behavior[MqttCmd] =
-        Behaviors.setup { _ctxt =>
-            Behaviors.receiveMessagePartial {
-                case CamFinished(id) if remaining.contains(id) =>
-                    val rem = remaining.filterNot(_ == id)
-                    if (rem.nonEmpty) {
-                        sendingOffline(mqttStream, rem)
-                    } else {
-                        mqttStream ! Terminate
-                        _ctxt.self ! TerminatedOk
-                        terminatingOk()
-                    }
-                case TerminatedOk =>
-                    mqttStream ! Terminate
-                    terminatingOk()
-                case TerminatedWithError(_) =>
-                    Behaviors.stopped
-                case _ =>
-                    Behaviors.same
-            }
-        }
 
     private def terminatingOk(): Behavior[MqttCmd] =
         Behaviors.receiveMessagePartial {
@@ -159,7 +123,7 @@ object MqttSystem extends ActorContextImplicits {
                 Behaviors.same
         }
 
-    def mqttStreamSource(baseTopic: String, settings: MqttConnectionSettings): RunnableGraph[((ActorRef, Future[Done]), Future[Done])] = {
+    private def mqttStreamSource(baseTopic: String, settings: MqttConnectionSettings): RunnableGraph[((ActorRef, Future[Done]), Future[Done])] = {
         val inputTopic = s"$baseTopic/camera/+/command/#"
 
         val mqttFlow: Flow[MqttMessageWithAck, MqttMessageWithAck, Future[Done]] =
