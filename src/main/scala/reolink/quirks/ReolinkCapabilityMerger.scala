@@ -14,7 +14,7 @@ object ReolinkCapabilityMerger {
             ReolinkQuirks.QUIRKS.find(k => m.model.matches(k._1)).map(_._2)
         }.getOrElse(Nil)
         // build final quirk list
-        val fns = List[Quirk](aiDetection) ++ quirks
+        val fns = List[Quirk](aiDetection, alarmSirenDetection) ++ quirks
         // apply quirks
         fns.foldLeft((config, caps, state))(applyQuirk)
     }
@@ -27,6 +27,12 @@ object ReolinkCapabilityMerger {
             config.aiDetectionMode.getOrElse(state.aiDetectionMode)
         } else AiDetectionMode.UnSupported
         (config, caps, state.copy(aiDetectionMode = aiDetectionModeMod))
+    }
+
+    private def alarmSirenDetection(config: ReolinkCameraModuleConfig, caps: ReolinkCapabilities, state: ReolinkState): (ReolinkCameraModuleConfig, ReolinkCapabilities, ReolinkState) = {
+        // I suppose that every camera that has a spotlight, also has an alarm siren ¯\_(ツ)_/¯
+        val hasAlarm = caps.spotlight
+        (config, caps.copy(alarm = hasAlarm), state)
     }
 
 }
