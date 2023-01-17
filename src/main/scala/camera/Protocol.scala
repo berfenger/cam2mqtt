@@ -123,7 +123,7 @@ object CameraConfig {
     case class ReolinkCameraModuleConfig(port: Option[Int], useSSL: Option[Boolean],
                                          altUsername: Option[String], altPassword: Option[String],
                                          syncDateTime: Boolean, aiDetectionMode: Option[AiDetectionMode.Value],
-                                         enableSpotlight: Boolean, enableAudio: Boolean, enableAlarm: Boolean) extends CameraModuleConfig {
+                                         enableSpotlight: Option[Boolean], enableAudio: Option[Boolean], enableAlarm: Option[Boolean]) extends CameraModuleConfig {
         override val moduleId: String = ReolinkModule.moduleId
 
         override type ModConf = ReolinkCameraModuleConfig

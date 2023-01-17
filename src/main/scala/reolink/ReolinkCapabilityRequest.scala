@@ -3,7 +3,8 @@ package reolink
 
 import akka.actor.ClassicActorSystemProvider
 import camera.CameraActionProtocol.NightVisionMode
-import camera.modules.reolink.{AiDetectionMode, ReolinkCapabilities, ReolinkState}
+import camera.modules.reolink.{AiDetectionMode, ReolinkCapabilities, ReolinkModel, ReolinkState}
+
 import org.codehaus.jettison.json.{JSONArray, JSONObject}
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -24,7 +25,8 @@ trait ReolinkCapabilityRequest extends ReolinkRequest {
             ReolinkCmd("GetAiState", 0, Channel(0)),
             ReolinkCmd("GetAlarm", 1, GetAlarmCommand(GetAlarmCommandParams(0, "md"))),
             ReolinkCmd("GetWhiteLed", 0, Channel(0)),
-            ReolinkCmd("GetAudioCfg", 0, Channel(0))
+            ReolinkCmd("GetAudioCfg", 0, Channel(0)),
+            ReolinkCmd("GetDevInfo", 0, null)
         )
         for {
             cmdRes <- runGetCommands(host, cmds)
@@ -62,6 +64,7 @@ trait ReolinkCapabilityRequest extends ReolinkRequest {
             case "GetAiState" => Try(parseGetAiState(caps, state, result)).toOption.getOrElse((caps, state))
             case "GetWhiteLed" => Try(parseGetWhiteLed(caps, state, result)).toOption.getOrElse((caps, state))
             case "GetAudioCfg" => Try(parseGetAudioCfg(caps, state, result)).toOption.getOrElse((caps, state))
+            case "GetDevInfo" => Try(parseGetDevInfo(caps, state, result)).toOption.getOrElse((caps, state))
             case _ => (caps, state)
         }
     }
@@ -173,7 +176,7 @@ trait ReolinkCapabilityRequest extends ReolinkRequest {
             case Right(json) =>
                 val params = OM.readValue(json.toString, classOf[GetAiStateParams])
                 val supported = params.dog_cat.isSupported || params.face.isSupported || params.people.isSupported ||
-                        params.vehicle.isSupported
+                    params.vehicle.isSupported
                 (caps.copy(aiDetection = supported), state.copy(aiDetectionMode = AiDetectionMode.Available, aiDetectionState = Some(params)))
         }
     }
@@ -201,7 +204,18 @@ trait ReolinkCapabilityRequest extends ReolinkRequest {
         }
     }
 
-    def runGetCommands(host: ReolinkHost, cmd: List[ReolinkCmd])
+    private def parseGetDevInfo(caps: ReolinkCapabilities, state: ReolinkState, result: Either[ReolinkCmdResponseError, JSONObject]): (ReolinkCapabilities, ReolinkState) = {
+        result match {
+            case Left(_) => (caps, state)
+            case Right(json) =>
+                val params = Try {
+                    OM.readValue(json.getJSONObject("DevInfo").toString, classOf[ReolinkModel])
+                }.toOption
+                (caps.copy(model = params), state)
+        }
+    }
+
+    private def runGetCommands(host: ReolinkHost, cmd: List[ReolinkCmd])
                       (implicit _as: ClassicActorSystemProvider, _ec: ExecutionContext): Future[String] = {
         reqPost(host, None, OM.writeValueAsString(cmd))
     }
