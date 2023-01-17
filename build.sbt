@@ -33,4 +33,7 @@ libraryDependencies ++= Seq(
 // add ability to define JVM options by "CAM2MQTT_OPTS" env variable
 bashScriptExtraDefines += """if [[ "$CAM2MQTT_OPTS" != "" ]]; then
                             |  addJava "${CAM2MQTT_OPTS}"
+                            |fi
+                            |if [[ "$DEBUG" = "1" ]]; then
+                            |  addJava "-Dlogback.configurationFile=logback-debug.xml"
                             |fi""".stripMargin
