@@ -59,14 +59,17 @@ Feel free to try other cameras and let me know if it works so I can update this 
 ##### Camera availability
     cam2mqtt/camera/{cameraId}/status online/offline
 
-### Onvif module
+### ONVIF module
 
-##### Motion events
+##### ONVIF motion events
     cam2mqtt/camera/{cameraId}/event/onvif/motion on/off
 
-##### AI Detection events (Reolink firmware >= 3.1.0.951, april 2022)
+##### Reolink AI Detection events (Reolink firmware >= 3.1.0.951, april 2022)
     cam2mqtt/camera/{cameraId}/event/onvif/object/people/detected on/off
     cam2mqtt/camera/{cameraId}/event/onvif/object/vehicle/detected on/off
+
+##### Reolink Visitor events
+    cam2mqtt/camera/{cameraId}/event/onvif/visitor on/off
 
 ### Reolink module
 
