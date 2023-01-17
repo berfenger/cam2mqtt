@@ -46,6 +46,8 @@ object CameraProtocol {
 
     case class CameraObjectDetectionEvent(override val cameraId: String, override val moduleId: String, objectClass: String, detection: Boolean) extends CameraEvent
 
+    case class CameraVisitorEvent(override val cameraId: String, override val moduleId: String, visitor: Boolean) extends CameraEvent
+
     case class CameraAvailableEvent(override val cameraId: String, available: Boolean) extends CameraEvent {
         override val moduleId: String = GenericMqttCamModule.moduleId
     }

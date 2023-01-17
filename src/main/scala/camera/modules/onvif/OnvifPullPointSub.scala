@@ -123,11 +123,7 @@ object OnvifPullPointSub extends ActorContextImplicits {
             val topic = n.select("*|Topic").text()
             stripNS(topic) match {
                 case "RuleEngine/CellMotionDetector/Motion" =>
-                    val motion = n.select("*|Message[PropertyOperation='Changed'] > *|Data > *|SimpleItem[Name='IsMotion']")
-                    if (!motion.isEmpty) {
-                        val isMotion = motion.attr("Value") == "true"
-                        Option(CameraMotionEvent(id, OnvifModule.moduleId, isMotion))
-                    } else None
+                    parseMotionEvent(id, n)
                 // AI object detection on Reolink cameras (firmware >= 3.1.0.951, April 2022)
                 case "RuleEngine/MyRuleDetector/PeopleDetect" =>
                     parseAIDetectionEvent(id, n, "people")
@@ -137,9 +133,19 @@ object OnvifPullPointSub extends ActorContextImplicits {
                     parseAIDetectionEvent(id, n, "vehicle")
                 case "RuleEngine/MyRuleDetector/DogCatDetect" =>
                     parseAIDetectionEvent(id, n, "pet")
+                case "RuleEngine/MyRuleDetector/Visitor" =>
+                    parseVisitorEvent(id, n)
                 case _ => None
             }
         }
+    }
+
+    private def parseMotionEvent(id: String, notif: Element) = {
+        val motion = notif.select("*|Message[PropertyOperation='Changed'] > *|Data > *|SimpleItem[Name='IsMotion']")
+        if (!motion.isEmpty) {
+            val isMotion = motion.attr("Value") == "true"
+            Option(CameraMotionEvent(id, OnvifModule.moduleId, isMotion))
+        } else None
     }
 
     private def parseAIDetectionEvent(id: String, notif: Element, objectClass: String) = {
@@ -147,6 +153,14 @@ object OnvifPullPointSub extends ActorContextImplicits {
         if (!motion.isEmpty) {
             val isDect = motion.attr("Value") == "true"
             Option(CameraObjectDetectionEvent(id, OnvifModule.moduleId, objectClass, isDect))
+        } else None
+    }
+
+    private def parseVisitorEvent(id: String, notif: Element) = {
+        val visitor = notif.select("*|Message[PropertyOperation='Changed'] > *|Data > *|SimpleItem[Name='State']")
+        if (!visitor.isEmpty) {
+            val isDect = visitor.attr("Value") == "true"
+            Option(CameraVisitorEvent(id, OnvifModule.moduleId, isDect))
         } else None
     }
 

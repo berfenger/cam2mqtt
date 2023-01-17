@@ -4,12 +4,13 @@ package camera.modules.onvif
 import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
 import akka.actor.typed.{ActorRef, Behavior}
 import camera.CameraConfig.{CameraInfo, OnvifCameraModuleConfig}
-import camera.CameraProtocol.{CameraAvailableEvent, CameraCmd, CameraEvent, CameraModuleEvent, CameraMotionEvent, CameraObjectDetectionEvent}
+import camera.CameraProtocol.{CameraAvailableEvent, CameraCmd, CameraEvent, CameraModuleEvent, CameraMotionEvent, CameraObjectDetectionEvent, CameraVisitorEvent}
 import camera.modules.onvif.OnvifSubProtocol._
 import config.WebhookConfig
 import onvif.OnvifRequests
 import onvif.OnvifSubscriptionRequests.SubscriptionInfo
 import utils.ActorContextImplicits
+
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
 import org.jsoup.parser.Parser
@@ -112,6 +113,8 @@ object OnvifWebhookSub extends ActorContextImplicits {
                     parseAIDetectionEvent(id, n, "vehicle")
                 case "RuleEngine/MyRuleDetector/DogCatDetect" =>
                     parseAIDetectionEvent(id, n, "pet")
+                case "RuleEngine/MyRuleDetector/Visitor" =>
+                    parseVisitorEvent(id, n)
                 case _ => None
             }
         }
@@ -122,6 +125,14 @@ object OnvifWebhookSub extends ActorContextImplicits {
         if (!motion.isEmpty) {
             val isDect = motion.attr("Value") == "true"
             Option(CameraObjectDetectionEvent(id, OnvifModule.moduleId, objectClass, isDect))
+        } else None
+    }
+
+    private def parseVisitorEvent(id: String, notif: Element) = {
+        val visitor = notif.select("*|Message[PropertyOperation='Changed'] > *|Data > *|SimpleItem[Name='State']")
+        if (!visitor.isEmpty) {
+            val isDect = visitor.attr("Value") == "true"
+            Option(CameraVisitorEvent(id, OnvifModule.moduleId, isDect))
         } else None
     }
 
