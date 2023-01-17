@@ -67,18 +67,23 @@ object O2MActorSystem {
                     running(Some(cameraManRef), mqttActor)
                 case Terminate =>
                     cameraManActor.foreach(_ ! cman.Terminate)
-                    mqttActor ! mqtt.Terminate
-                    finishing(cameraManActor.toList ++ List(mqttActor))
+                    finishing(cameraManActor.toList, Option(mqttActor))
             }
         }
     }
 
-    private def finishing(monitored: List[ActorRef[_]]): Behavior[O2MCommand] =
+    private def finishing(monitored: List[ActorRef[_]], mqttActor: Option[ActorRef[MqttCmd]]): Behavior[O2MCommand] =
         Behaviors.receiveSignal {
             case (_, Terminated(a)) =>
-                val remaining = monitored.filterNot(_ == a)
-                if (remaining.nonEmpty)
-                    finishing(remaining)
+                val monitored_rem = monitored.filterNot(_ == a)
+                val mqttActor_rem = mqttActor.filter(_ != a)
+                // when cameras have finished, terminate MQTT
+                if (monitored_rem.isEmpty) {
+                    mqttActor.foreach(_ ! mqtt.Terminate)
+                }
+                // stop when all children are stopped
+                if (monitored_rem.nonEmpty || mqttActor_rem.isDefined)
+                    finishing(monitored_rem, mqttActor_rem)
                 else {
                     Behaviors.stopped
                 }
