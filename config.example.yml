@@ -20,6 +20,7 @@ cameras:
         port: 8000
         monitor_events: true
         prefer_webhook_subscription: false
+        # motion_debounce: true
       reolink:
         # port: 443 # optional. 443/HTTPS by default
         # username: bob # optional. Alternative username for Reolink API

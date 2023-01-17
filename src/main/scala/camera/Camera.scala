@@ -1,16 +1,16 @@
 package net.bfgnet.cam2mqtt
 package camera
 
-import akka.actor.ActorSystem
-import akka.actor.typed.scaladsl.adapter._
-import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
-import akka.actor.typed._
 import camera.CameraConfig.CameraInfo
 import camera.CameraProtocol._
 import camera.modules.CameraModules
-import camera.modules.onvif.OnvifModule
 import camera.modules.reolink.ReolinkModule
 import eventbus.CameraEventBus
+
+import akka.actor.ActorSystem
+import akka.actor.typed._
+import akka.actor.typed.scaladsl.adapter._
+import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
 
 import scala.concurrent.duration._
 
@@ -28,12 +28,12 @@ object Camera {
                 }.toMap
                 // watch children
                 children.values.foreach(context.watch)
-                routing(info, children, motion = false, available = false)
+                routing(info, children, available = false)
             }
         }.onFailure(SupervisorStrategy.restartWithBackoff(minBackoff = 4.seconds, maxBackoff = 1.minute, randomFactor = 0.2))
     }
 
-    private def routing(info: CameraInfo, modules: Map[String, ActorRef[CameraCmd]], motion: Boolean, available: Boolean)(implicit context: ActorContext[CameraCmd]): Behavior[CameraCmd] = {
+    private def routing(info: CameraInfo, modules: Map[String, ActorRef[CameraCmd]], available: Boolean)(implicit context: ActorContext[CameraCmd]): Behavior[CameraCmd] = {
         Behaviors.receiveMessagePartial[CameraCmd] {
             case ev@CameraModuleMessage(camId, modId, _) if info.cameraId == camId && modules.contains(modId) =>
                 modules(modId) ! ev
@@ -46,12 +46,10 @@ object Camera {
                 Behaviors.same
             case CameraModuleEvent(_, _, ev: CameraMotionEvent) =>
                 // if motion state does not change, discard event
-                if (motion != ev.motion) {
-                    CameraEventBus.bus.publish(ev)
-                    // send motion event to Reolink module if available (for AI detection integration)
-                    modules.get(ReolinkModule.moduleId).foreach(_ ! CameraModuleEvent(ev.cameraId, ev.moduleId, ev))
-                    routing(info, modules, ev.motion, available)
-                } else Behaviors.same
+                CameraEventBus.bus.publish(ev)
+                // send motion event to Reolink module if available (for AI detection integration)
+                modules.get(ReolinkModule.moduleId).foreach(_ ! CameraModuleEvent(ev.cameraId, ev.moduleId, ev))
+                Behaviors.same
             case CameraModuleEvent(_, _, ev: CameraObjectDetectionEvent) =>
                 CameraEventBus.bus.publish(ev)
                 Behaviors.same
@@ -59,17 +57,13 @@ object Camera {
                 // if available state does not change, discard event
                 if (available != ev.available) {
                     CameraEventBus.bus.publish(ev)
-                    routing(info, modules, motion, ev.available)
+                    routing(info, modules, ev.available)
                 } else Behaviors.same
             case CameraModuleEvent(_, _, ev) =>
                 // for other module events, just redirect
                 CameraEventBus.bus.publish(ev)
                 Behaviors.same
             case TerminateCam =>
-                // if motion, publish default state
-                if (motion) {
-                    CameraEventBus.bus.publish(CameraMotionEvent(info.cameraId, OnvifModule.moduleId, motion = false))
-                }
                 // Stop children modules
                 modules.values.foreach(_ ! TerminateCam)
                 finishing(info.cameraId, modules.values.toList)

@@ -114,7 +114,7 @@ object CameraConfig {
         def copyWithPrivacy(): CameraInfo = this.copy(password = "redacted", modules = modules.map(_.copyWithPrivacy()))
     }
 
-    case class OnvifCameraModuleConfig(port: Int, monitorEvents: Boolean, preferWebhookSub: Boolean) extends CameraModuleConfig {
+    case class OnvifCameraModuleConfig(port: Int, monitorEvents: Boolean, preferWebhookSub: Boolean, debounceMotion: Boolean) extends CameraModuleConfig {
         override val moduleId: String = OnvifModule.moduleId
 
         override type ModConf = OnvifCameraModuleConfig
