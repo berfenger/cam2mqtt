@@ -1,18 +1,14 @@
-FROM alpine:3.15.1
+FROM alpine:3.17.1
 
-RUN apk add --no-cache tzdata ca-certificates bash
-
-SHELL ["/bin/bash", "-c"]
+RUN apk add --no-cache tzdata ca-certificates
 
 ARG TARGETPLATFORM
-
-RUN echo ARCH DBG: $TARGETARCH $TARGETPLATFORM
 
 RUN \
     if [ "$TARGETPLATFORM" = "linux/arm/v7" ]; then \
         apk add --no-cache openjdk8-jre; \
     else \
-        apk add --no-cache openjdk11-jre; \
+        apk add --no-cache openjdk17-jre; \
     fi
 
 ADD ./target/universal/stage/bin /opt/app/bin
