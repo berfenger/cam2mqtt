@@ -1,24 +1,23 @@
 package net.bfgnet.cam2mqtt
 package camera.modules.onvif
 
-import java.io.IOException
-import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
-import akka.actor.typed.{ActorRef, Behavior, PostStop}
 import camera.CameraConfig.{CameraInfo, OnvifCameraModuleConfig}
 import camera.CameraProtocol._
 import camera.modules.onvif.OnvifSubProtocol._
 import onvif.OnvifRequests
 import onvif.OnvifSubscriptionRequests.SubscriptionInfo
 import utils.ActorContextImplicits
-import org.jsoup.Jsoup
-import org.jsoup.nodes.Element
-import org.jsoup.parser.Parser
 
+import akka.actor.typed.scaladsl.Behaviors
+import akka.actor.typed.{ActorRef, Behavior, PostStop}
+
+import java.io.IOException
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
-import scala.jdk.CollectionConverters._
 
-object OnvifPullPointSub extends ActorContextImplicits {
+object OnvifPullPointSub extends ActorContextImplicits with OnvifMessageParser {
+
+    private val MESSAGE_PARSER_ROUTE = "*|Envelope > *|Body > *|PullMessagesResponse > *|NotificationMessage"
 
     def apply(parent: ActorRef[CameraCmd], info: CameraInfo, config: OnvifCameraModuleConfig): Behavior[OnvifSubCmd] = stopped(parent, info, config)
 
@@ -86,7 +85,7 @@ object OnvifPullPointSub extends ActorContextImplicits {
                     val pullMsgs = OnvifRequests.pullMessagesFromSubscription(info.host, config.port, info.username, info.password, subscription.address, 10)
                     context.pipeToSelf(pullMsgs) {
                         case Success(value) =>
-                            val messages = parsePullPointMessage(info.cameraId, value)
+                            val messages = parseMessage(MESSAGE_PARSER_ROUTE)(info.cameraId, value)
                             context.log.trace(s"pulled ${messages.size} messages")
                             PullPointEvents(info.cameraId, messages)
                         case Failure(err) => SubscriptionError(err)
@@ -112,62 +111,6 @@ object OnvifPullPointSub extends ActorContextImplicits {
                 Behaviors.stopped
             case _ =>
                 Behaviors.same
-        }
-    }
-
-    private def parsePullPointMessage(id: String, xml: String)(implicit _context: ActorContext[_]): List[CameraEvent] = {
-        _context.log.trace(s"subscription message: $xml")
-        val doc = Jsoup.parse(xml, "", Parser.xmlParser())
-        val notifs = doc.select("*|Envelope > *|Body > *|PullMessagesResponse > *|NotificationMessage").listIterator().asScala.toList
-        notifs.flatMap { n =>
-            val topic = n.select("*|Topic").text()
-            stripNS(topic) match {
-                case "RuleEngine/CellMotionDetector/Motion" =>
-                    parseMotionEvent(id, n)
-                // AI object detection on Reolink cameras (firmware >= 3.1.0.951, April 2022)
-                case "RuleEngine/MyRuleDetector/PeopleDetect" =>
-                    parseAIDetectionEvent(id, n, "people")
-                case "RuleEngine/MyRuleDetector/FaceDetect" =>
-                    parseAIDetectionEvent(id, n, "face")
-                case "RuleEngine/MyRuleDetector/VehicleDetect" =>
-                    parseAIDetectionEvent(id, n, "vehicle")
-                case "RuleEngine/MyRuleDetector/DogCatDetect" =>
-                    parseAIDetectionEvent(id, n, "pet")
-                case "RuleEngine/MyRuleDetector/Visitor" =>
-                    parseVisitorEvent(id, n)
-                case _ => None
-            }
-        }
-    }
-
-    private def parseMotionEvent(id: String, notif: Element) = {
-        val motion = notif.select("*|Message[PropertyOperation='Changed'] > *|Data > *|SimpleItem[Name='IsMotion']")
-        if (!motion.isEmpty) {
-            val isMotion = motion.attr("Value") == "true"
-            Option(CameraMotionEvent(id, OnvifModule.moduleId, isMotion))
-        } else None
-    }
-
-    private def parseAIDetectionEvent(id: String, notif: Element, objectClass: String) = {
-        val motion = notif.select("*|Message[PropertyOperation='Changed'] > *|Data > *|SimpleItem[Name='State']")
-        if (!motion.isEmpty) {
-            val isDect = motion.attr("Value") == "true"
-            Option(CameraObjectDetectionEvent(id, OnvifModule.moduleId, objectClass, isDect))
-        } else None
-    }
-
-    private def parseVisitorEvent(id: String, notif: Element) = {
-        val visitor = notif.select("*|Message[PropertyOperation='Changed'] > *|Data > *|SimpleItem[Name='State']")
-        if (!visitor.isEmpty) {
-            val isDect = visitor.attr("Value") == "true"
-            Option(CameraVisitorEvent(id, OnvifModule.moduleId, isDect))
-        } else None
-    }
-
-    private def stripNS(str: String) = {
-        str.indexOf(":") match {
-            case idx if idx > 0 => str.substring(idx + 1)
-            case _ => str
         }
     }
 
