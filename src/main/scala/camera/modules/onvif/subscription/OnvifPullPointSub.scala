@@ -1,9 +1,10 @@
 package net.bfgnet.cam2mqtt
-package camera.modules.onvif
+package camera.modules.onvif.subscription
 
 import camera.CameraConfig.{CameraInfo, OnvifCameraModuleConfig}
 import camera.CameraProtocol._
-import camera.modules.onvif.OnvifSubProtocol._
+import camera.modules.onvif.OnvifModule
+import OnvifSubProtocol._
 import onvif.OnvifRequests
 import onvif.OnvifSubscriptionRequests.SubscriptionInfo
 import utils.ActorContextImplicits

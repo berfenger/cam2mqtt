@@ -1,5 +1,5 @@
 package net.bfgnet.cam2mqtt
-package camera.modules.onvif
+package camera.modules.onvif.subscription
 
 import camera.CameraProtocol.CameraEvent
 import onvif.OnvifSubscriptionRequests.SubscriptionInfo

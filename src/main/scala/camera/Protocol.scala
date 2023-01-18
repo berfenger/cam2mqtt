@@ -9,6 +9,8 @@ import camera.modules.generic.GenericMqttCamModule
 import camera.modules.onvif.OnvifModule
 import camera.modules.reolink.{AiDetectionMode, ReolinkModule}
 
+import scala.concurrent.duration.FiniteDuration
+
 object CameraManProtocol {
 
     sealed trait CameraManCmd
@@ -114,7 +116,8 @@ object CameraConfig {
         def copyWithPrivacy(): CameraInfo = this.copy(password = "redacted", modules = modules.map(_.copyWithPrivacy()))
     }
 
-    case class OnvifCameraModuleConfig(port: Int, monitorEvents: Boolean, preferWebhookSub: Boolean, debounceMotion: Boolean) extends CameraModuleConfig {
+    case class OnvifCameraModuleConfig(port: Int, monitorEvents: Boolean, preferWebhookSub: Boolean,
+                                       debounceMotion: Boolean, forceDebounceDuration: Option[FiniteDuration]) extends CameraModuleConfig {
         override val moduleId: String = OnvifModule.moduleId
 
         override type ModConf = OnvifCameraModuleConfig

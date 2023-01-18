@@ -21,6 +21,7 @@ cameras:
         monitor_events: true
         prefer_webhook_subscription: false
         # motion_debounce: true
+        # force_motion_debounce_time: 2 seconds # send motion=off after this time if camera does not report any other motion event
       reolink:
         # port: 443 # optional. 443/HTTPS by default
         # username: bob # optional. Alternative username for Reolink API
