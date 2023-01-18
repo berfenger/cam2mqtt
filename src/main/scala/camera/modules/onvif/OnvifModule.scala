@@ -59,43 +59,52 @@ object OnvifModule extends CameraModule with OnvifModuleUtils with MqttCameraMod
     }
 
     private def started(parent: ActorRef[CameraCmd], camera: CameraInfo, config: OnvifCameraModuleConfig,
-                        subscriptionActor: Option[ActorRef[OnvifSubCmd]], motion: Boolean): Behavior[CameraCmd] = {
-        Behaviors.receiveMessagePartial[CameraCmd] {
-            // webhook notification
-            case CameraModuleMessage(_, _, msg) =>
-                subscriptionActor.foreach(_ ! WebhookNotification(msg))
-                Behaviors.same
-            // Event from subscription
-            case ev@CameraModuleEvent(_, _, CameraMotionEvent(_, _, evMotion)) =>
-                val updateMotion = (motion != evMotion) || !config.debounceMotion
-                if (updateMotion) {
-                    parent ! ev
-                    started(parent, camera, config, subscriptionActor, evMotion)
-                } else {
+                        subscriptionActor: Option[ActorRef[OnvifSubCmd]], motion: Boolean, motionDebouncer: Option[Cancellable]): Behavior[CameraCmd] = {
+        Behaviors.setup[CameraCmd] { implicit context =>
+            Behaviors.receiveMessagePartial[CameraCmd] {
+                // webhook notification
+                case CameraModuleMessage(_, _, msg) =>
+                    subscriptionActor.foreach(_ ! WebhookNotification(msg))
                     Behaviors.same
-                }
-            case ev: CameraModuleEvent =>
-                parent ! ev
-                Behaviors.same
-            case WrappedModuleCmd(OnvifError(err)) =>
-                throw err
-            case TerminateCam =>
-                // if motion, publish default state
-                if (motion) {
-                    CameraEventBus.bus.publish(CameraMotionEvent(camera.cameraId, OnvifModule.moduleId, motion = false))
-                }
-                subscriptionActor match {
-                    case Some(s) =>
-                        s ! TerminateSubscription
-                        finishing(List(s))
-                    case None =>
-                        Behaviors.stopped
-                }
-        }.receiveSignal {
-            case (_, Terminated(actor)) =>
-                throw new Exception(s"subscription actor [$actor] failed")
-            case (_, PostStop) =>
-                Behaviors.same
+                // Event from subscription
+                case ev@CameraModuleEvent(_, _, CameraMotionEvent(_, _, evMotion)) =>
+                    // force debounce logic
+                    motionDebouncer.foreach(_.cancel())
+                    val newMotionDebouncer = if (evMotion) {
+                        config.forceDebounceDuration.map { fdd =>
+                            context.scheduleOnce(fdd, context.self, CameraModuleEvent(camera.cameraId, OnvifModule.moduleId,
+                                CameraMotionEvent(camera.cameraId, OnvifModule.moduleId, motion = false)))
+                        }
+                    } else None
+                    // update motion variable following debounce config
+                    val updateMotion = (motion != evMotion) || !config.debounceMotion
+                    if (updateMotion) {
+                        parent ! ev
+                    }
+                    started(parent, camera, config, subscriptionActor, evMotion, newMotionDebouncer)
+                case ev: CameraModuleEvent =>
+                    parent ! ev
+                    Behaviors.same
+                case WrappedModuleCmd(OnvifError(err)) =>
+                    throw err
+                case TerminateCam =>
+                    // if motion, publish default state
+                    if (motion) {
+                        CameraEventBus.bus.publish(CameraMotionEvent(camera.cameraId, OnvifModule.moduleId, motion = false))
+                    }
+                    subscriptionActor match {
+                        case Some(s) =>
+                            s ! TerminateSubscription
+                            finishing(List(s))
+                        case None =>
+                            Behaviors.stopped
+                    }
+            }.receiveSignal {
+                case (_, Terminated(actor)) =>
+                    throw new Exception(s"subscription actor [$actor] failed")
+                case (_, PostStop) =>
+                    Behaviors.same
+            }
         }
     }
 
