@@ -1,24 +1,19 @@
 package net.bfgnet.cam2mqtt
 package camera.modules.onvif
 
-import camera.CameraActionProtocol
 import camera.CameraConfig.{CameraInfo, CameraModuleConfig, OnvifCameraModuleConfig}
 import camera.CameraProtocol._
-import camera.modules.onvif.OnvifSubProtocol.{OnvifSubCmd, TerminateSubscription, WebhookNotification}
+import camera.modules.onvif.subscription.OnvifSubProtocol.{OnvifSubCmd, TerminateSubscription, WebhookNotification}
+import camera.modules.onvif.subscription.{OnvifPullPointSub, OnvifWebhookSub}
 import camera.modules.{CameraModule, MqttCameraModule}
 import config.ConfigManager
 import eventbus.CameraEventBus
 import onvif.OnvifGetPropertiesRequests.OnvifCapabilitiesResponse
-import onvif.OnvifRequests
 import utils.ActorContextImplicits
 
-import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
+import akka.actor.Cancellable
+import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.{ActorRef, Behavior, PostStop, Terminated}
-import akka.stream.alpakka.mqtt.MqttMessage
-import akka.util.ByteString
-
-import scala.collection.mutable
-import scala.util.{Failure, Success}
 
 sealed trait OnvifModuleCmd
 
@@ -26,7 +21,7 @@ case class OnvifCapabilities(resp: OnvifCapabilitiesResponse) extends OnvifModul
 
 case class OnvifError(error: Throwable) extends OnvifModuleCmd
 
-object OnvifModule extends CameraModule with MqttCameraModule with ActorContextImplicits {
+object OnvifModule extends CameraModule with OnvifModuleUtils with MqttCameraModule with ActorContextImplicits {
     override val moduleId: String = "onvif"
 
     override def createBehavior(camera: ActorRef[CameraCmd], info: CameraInfo, config: CameraModuleConfig): Behavior[CameraCmd] =
@@ -54,7 +49,7 @@ object OnvifModule extends CameraModule with MqttCameraModule with ActorContextI
                         context.watch(a)
                         a
                     }
-                    started(parent, camera, config, subActor, motion = false)
+                    started(parent, camera, config, subActor, motion = false, None)
                 case WrappedModuleCmd(OnvifError(err)) =>
                     throw err
                 case TerminateCam =>
@@ -114,50 +109,4 @@ object OnvifModule extends CameraModule with MqttCameraModule with ActorContextI
                     Behaviors.stopped
                 }
         }
-
-    private def getOnvifCapabilities(camera: CameraInfo, config: OnvifCameraModuleConfig)(implicit _ac: ActorContext[CameraCmd]) = {
-        _ac.pipeToSelf(OnvifRequests.getCapabilities(camera.host, config.port, camera.username, camera.password)) {
-            case Success(r) => WrappedModuleCmd(OnvifCapabilities(r))
-            case Failure(ex) => WrappedModuleCmd(OnvifError(ex))
-        }
-    }
-
-    override def loadConfiguration(from: Map[String, Any]): CameraModuleConfig = {
-        import utils.ConfigParserUtils._
-        val port = from.getInt("port").getOrElse(8000)
-        val monitorEvs = from.getBool("monitor_events")
-        val preferWebhook = from.getBool("prefer_webhook_subscription")
-        val debounceMotion = from.getBool("motion_debounce").orTrue
-        OnvifCameraModuleConfig(port, monitorEvs.orFalse, preferWebhook.orFalse, debounceMotion)
-    }
-
-    override def parseMQTTCommand(path: List[String], stringData: String): Option[CameraActionProtocol.CameraActionRequest] = None
-
-    override def eventToMqttMessage(ev: CameraEvent): Option[MqttMessage] = ev match {
-        case CameraMotionEvent(cameraId, moduleId, motion) =>
-            val value = if (motion) "on" else "off"
-            Some(MqttMessage(s"${cameraEventModulePath(cameraId, moduleId)}/motion", ByteString(value)))
-        case CameraObjectDetectionEvent(cameraId, moduleId, objectClass, detection) =>
-            val value = if (detection) "on" else "off"
-            Some(MqttMessage(s"${cameraEventModulePath(cameraId, moduleId)}/object/$objectClass/detected", ByteString(value)))
-        case CameraVisitorEvent(cameraId, moduleId, detection) =>
-            val value = if (detection) "on" else "off"
-            Some(MqttMessage(s"${cameraEventModulePath(cameraId, moduleId)}/visitor", ByteString(value)))
-        case _ => None
-    }
-
-    private def logCapabilities(cameraId: String, caps: OnvifCapabilitiesResponse)(implicit _ac: ActorContext[_]) = {
-        val c = new mutable.StringBuilder()
-        c ++= s"ONVIF Capabilities for camera $cameraId:\n"
-        if (caps.hasEvents) {
-            c ++= s"Events: ${caps.hasEvents}\n"
-        }
-        if (caps.hasPullPointSupport) {
-            c ++= s"Pull-Point subscription: ${caps.hasPullPointSupport}\n"
-        }
-        if (caps.hasPTZ) {
-            c ++= s"PTZ: ${caps.hasPTZ}\n"
-        }
-        _ac.log.info(c.toString().trim)
-    }
 }

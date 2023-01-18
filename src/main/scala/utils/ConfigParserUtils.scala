@@ -1,6 +1,7 @@
 package net.bfgnet.cam2mqtt
 package utils
 
+import scala.concurrent.duration.Duration
 import scala.util.Try
 
 object ConfigParserUtils {
@@ -12,9 +13,11 @@ object ConfigParserUtils {
         def getString(key: String): Option[String] =
             Try(from.get(key)).toOption.flatten.filter(_ != null).map(_.toString).filter(_.nonEmpty)
 
-        def getInt(key: String): Option[Int] = {
+        def getInt(key: String): Option[Int] =
             Try(from.get(key)).toOption.flatten.filter(_ != null).flatMap(v => Try(v.toString.toInt).toOption)
-        }
+
+        def getDuration(key: String): Option[Duration] =
+            Try(from.get(key)).toOption.flatten.filter(_ != null).flatMap(v => Try(Duration(v.toString)).toOption)
     }
 
     implicit class BooleanOptionExt(from: Option[Boolean]) {

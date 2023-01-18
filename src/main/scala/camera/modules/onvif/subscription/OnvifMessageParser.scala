@@ -1,7 +1,8 @@
 package net.bfgnet.cam2mqtt
-package camera.modules.onvif
+package camera.modules.onvif.subscription
 
 import camera.CameraProtocol.{CameraEvent, CameraMotionEvent, CameraObjectDetectionEvent, CameraVisitorEvent}
+import camera.modules.onvif.OnvifModule
 
 import akka.actor.typed.scaladsl.ActorContext
 import org.jsoup.Jsoup
