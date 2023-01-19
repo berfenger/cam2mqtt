@@ -3,7 +3,7 @@ name: ci
 on:
   push:
     branches: master
-    tag: 'v*'
+    tag: 'v**'
   pull_request:
     branches: master
 
