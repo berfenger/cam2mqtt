@@ -5,24 +5,24 @@
 This package aims to implement a translation layer between camera interfaces 
 (ONVIF, ad-hoc HTTP APIs, etc) and MQTT.
 
-#### Why not use other software like [onvif2mqtt](https://github.com/dmitrif/onvif2mqtt)?
+#### Motivation
 
-Software based on `onvif` node library is prone to reliability problems.
+Some ONVIF software libraries are prone to reliability problems.
 If a camera goes offline for a while, the library won't know the camera is offline
 and won't recover nor fail (e.g. letting docker-compose restart the container).
-Moreover, this software doesn't release resources reserved on the cameras (like ONVIF subscriptions)
+Moreover, some programs don't release resources reserved on the cameras (like ONVIF subscriptions)
 which can cause random connection problems on some cameras.
-These are severe problems for a security/alarm system.
+These are severe problems for a security/alarm system that this software aims to solve.
 
 ## Features
 
 This program is designed with reliability in mind. Every component is independent and tries
-to recover by itself if any connection problem happens.
+to recover by itself if any problem happens.
 
-For now only two modules are implemented:
+For now, only two modules are implemented:
 * ONVIF Events:
   * Motion events
-  * AI powered object detection (only Reolink cameras on firmwares >= April 2022).
+  * AI powered object detection (only Reolink cameras on firmware >= 3.1.0.951, april 2022).
 * Reolink:
   * Control
     * PTZ (absolute zoom)
@@ -32,7 +32,7 @@ For now only two modules are implemented:
     * Sync date time
     * Enable/disable Record (V1 & V2)
     * Enable/disable FTP (V1 & V2)
-    * Turn on/off spotlight
+    * Turn on/off spotlight and change brightness
     * Change audio volume
     * Play alarm
   * AI powered object detection
@@ -47,68 +47,65 @@ For now only two modules are implemented:
 * Al least one compatible camera
 
 ## Hardware Compatibility
-* Reolink RLC-520, RLC-511W
-* Reolink RLC-520A, RLC-511WA, RLC-810A, RLC-811A, RLC-822A (incl. people and vehicle AI detection)
-* Other Reolink ONVIF cameras should work.
+* Reolink RLC-410, RLC-520, RLC-511W, E1 Zoom
+* Reolink RLC-510A, RLC-520A, RLC-511WA, RLC-810A, RLC-811A, RLC-820A, RLC-822A (incl. people and vehicle AI detection)
+* Reolink Video Doorbell PoE/Wifi
+* Other Reolink IP ONVIF cameras should work.
 * Any other IP camera supporting ONVIF event subscriptions (webhook or pullpoint-subscription based) should work.
 
 Feel free to try other cameras and let me know if it works so I can update this list.
 
 ## MQTT Protocol
 
-##### Camera availability
-    cam2mqtt/camera/{cameraId}/status online/offline
+Check the MQTT protocol on this [page](./MQTT.md).
 
-### ONVIF module
+## Run
 
-##### ONVIF motion events
-    cam2mqtt/camera/{cameraId}/event/onvif/motion on/off
+#### Using docker/docker-compose
 
-##### Reolink AI Detection events (Reolink firmware >= 3.1.0.951, april 2022)
-    cam2mqtt/camera/{cameraId}/event/onvif/object/people/detected on/off
-    cam2mqtt/camera/{cameraId}/event/onvif/object/vehicle/detected on/off
+A precompiled docker image is available on docker hub.
+```yaml
+image: acasal/cam2mqtt:latest
+```
 
-##### Reolink Visitor events
-    cam2mqtt/camera/{cameraId}/event/onvif/visitor on/off
+Use the included [docker-compose.yml](./docker-compose.yml) and the example config file [config.example.yml](./config.example.yml) as a template to create your config file.
 
-### Reolink module
+`$ docker-compose up`
 
-##### States
-    cam2mqtt/camera/{cameraId}/state/reolink/nightvision auto/on/off
-    cam2mqtt/camera/{cameraId}/state/reolink/irlights on/off
-    cam2mqtt/camera/{cameraId}/state/reolink/motion/sensitivity 0-100
-    cam2mqtt/camera/{cameraId}/state/reolink/ptz/zoom/absolute 0-100
-    cam2mqtt/camera/{cameraId}/state/reolink/record on/off
-    cam2mqtt/camera/{cameraId}/state/reolink/ftp on/off
-    cam2mqtt/camera/{cameraId}/state/reolink/ai_detection_mode on_motion
-    cam2mqtt/camera/{cameraId}/state/reolink/audio/volume 0-100
+NOTE: if you don't use the ONVIF webHook subscription method, you can remove the `port` section on `docker-compose.yml`.
 
-##### Commands
-    cam2mqtt/camera/{cameraId}/command/reolink/nightvision auto/on/off
-    cam2mqtt/camera/{cameraId}/command/reolink/irlights on/off
-    cam2mqtt/camera/{cameraId}/command/reolink/ftp on/off
-    cam2mqtt/camera/{cameraId}/command/reolink/motion/sensitivity 0-100
-    cam2mqtt/camera/{cameraId}/command/reolink/ptz/zoom/absolute 0-100
-    cam2mqtt/camera/{cameraId}/command/reolink/record on/off
-    cam2mqtt/camera/{cameraId}/command/reolink/ftp on/off
-    cam2mqtt/camera/{cameraId}/command/reolink/audio/volume 0-100
-    cam2mqtt/camera/{cameraId}/command/reolink/alarm/play on/off/1-100
+## Build
 
-##### Motion events (AI detection)
-    cam2mqtt/camera/{cameraId}/event/reolink/aidetection/people/detected on/off
-    cam2mqtt/camera/{cameraId}/event/reolink/aidetection/vehicle/detected on/off
-    cam2mqtt/camera/{cameraId}/event/reolink/aidetection/pet/detected on/off
-    cam2mqtt/camera/{cameraId}/event/reolink/aidetection/face/detected on/off
+#### Using SBT
+`$ sbt compile stage`\
+The resulting binaries will be located at `target/universal/stage`
 
-## Clarification on Reolink's AI-based detection capabilities
+`$ CONFIG=./my_config_file.yml sbt`\
+`sbt:cam2mqtt> run`
+
+## Troubleshooting
+
+### I only receive the first `motion on` event from my Reolink camera
+
+Some cameras like RLC-410W and E1 Zoom don't send the `motion: off` event, so it should be generated by software.
+To fix this issue, add this setting to your camera onvif module config.
+```yaml
+      onvif:
+        force_motion_debounce_time: 2 seconds
+```
+Adjust the time to fit your camera. A value between 1-3 seconds should be enough.
+
+### I don't receive AI detection events (people or vehicle detection) from my Reolink camera
+
+This feature is only available on "A" Reolink cameras.
 
 Reolink cameras have 2 ways to communicate AI detection state.
- * HTTP API: Polling based. Supported by all "A" IP cameras.
- * Onvif subscription: Supported on some "A" cameras. Only those on firmware `>= 3.1.0.951, april 2022`. Most of the cameras don't have this firmware available as of December 2022.
+* HTTP API: Polling based. Supported by all "A" IP cameras.
+* ONVIF subscription: Supported on some "A" cameras. Only those on firmware `>= 3.1.0.951, april 2022`. Most of the cameras don't have this firmware available as of December 2022.
 
-For cameras on firmware `< 3.1.0.951, april 2022` you should use the `reolink` module with option `ai_detection_mode: on_motion` if using it in conjunction with `onvif` module (recommended), or `ai_detection_mode: continuous` if not using the `onvif` module. 
+For cameras on firmware `< 3.1.0.951, april 2022` you should use the `reolink` module with option `ai_detection_mode: on_motion` if using it in conjunction with `onvif` module (recommended), or `ai_detection_mode: continuous` if not using the `onvif` module.
 
-For cameras on firmware `>= 3.1.0.951, april 2022`, if using `reolink` module you should use `ai_detection_mode: off` (default behavior).
+For cameras on firmware `>= 3.1.0.951, april 2022`, if using `reolink` module you should set `ai_detection_mode: off` (default behavior).
 
 ## Licensing
 Copyright 2023 Arturo Casal
