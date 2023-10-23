@@ -40,6 +40,7 @@ For now, only two modules are implemented:
 * ONVIF Events:
   * Motion events
   * AI powered object detection (only Reolink cameras on firmware >= 3.1.0.951, april 2022).
+  * Visitor button press (on Reolink Video Doorbell)
 * Reolink:
   * Control
     * PTZ (absolute zoom)
