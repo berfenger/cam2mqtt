@@ -65,7 +65,7 @@ For now, only two modules are implemented:
 * Al least one compatible camera
 
 ## Hardware Compatibility
-* Reolink RLC-410, RLC-520, RLC-511W, E1 Zoom
+* Reolink CX410, RLC-410, RLC-520, RLC-511W, E1 Zoom
 * Reolink RLC-510A, RLC-520A, RLC-511WA, RLC-810A, RLC-811A, RLC-820A, RLC-822A (incl. people and vehicle AI detection)
 * Reolink Video Doorbell PoE/Wifi
 * Other Reolink IP ONVIF cameras should work.
@@ -124,6 +124,8 @@ Reolink cameras have 2 ways to communicate AI detection state.
 For cameras on firmware `< 3.1.0.951, april 2022` you should use the `reolink` module with option `ai_detection_mode: on_motion` if using it in conjunction with `onvif` module (recommended), or `ai_detection_mode: continuous` if not using the `onvif` module.
 
 For cameras on firmware `>= 3.1.0.951, april 2022`, if using `reolink` module you should set `ai_detection_mode: off` (default behavior).
+
+Check this [Reolink firmware repository](https://github.com/AT0myks/reolink-fw-archive) for and updated firmware for your Reolink camera.
 
 ## Licensing
 Copyright 2023 Arturo Casal
