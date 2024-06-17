@@ -78,11 +78,11 @@ object O2MActorSystem {
                 val monitored_rem = monitored.filterNot(_ == a)
                 val mqttActor_rem = mqttActor.filter(_ != a)
                 // when cameras have finished, terminate MQTT
-                if (monitored_rem.isEmpty) {
+                if (monitored_rem.isEmpty && mqttActor_rem.nonEmpty) {
                     mqttActor.foreach(_ ! mqtt.Terminate)
                 }
                 // stop when all children are stopped
-                if (monitored_rem.nonEmpty || mqttActor_rem.isDefined)
+                if (monitored_rem.nonEmpty || mqttActor_rem.nonEmpty)
                     finishing(monitored_rem, mqttActor_rem)
                 else {
                     Behaviors.stopped
