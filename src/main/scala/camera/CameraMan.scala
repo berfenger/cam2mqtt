@@ -1,8 +1,8 @@
 package net.bfgnet.cam2mqtt
 package camera
 
-import akka.actor.typed.scaladsl.Behaviors
-import akka.actor.typed.{ActorRef, Behavior, Terminated}
+import org.apache.pekko.actor.typed.scaladsl.Behaviors
+import org.apache.pekko.actor.typed.{ActorRef, Behavior, Terminated}
 import camera.CameraConfig.CameraInfo
 import camera.CameraManProtocol.{CameraManCmd, _}
 import camera.CameraProtocol._

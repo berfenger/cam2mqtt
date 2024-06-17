@@ -1,11 +1,11 @@
 package net.bfgnet.cam2mqtt
 package onvif
 
-import akka.actor.ClassicActorSystemProvider
-import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.HttpHeader.ParsingResult
-import akka.http.scaladsl.model._
-import akka.http.scaladsl.unmarshalling.Unmarshal
+import org.apache.pekko.actor.ClassicActorSystemProvider
+import org.apache.pekko.http.scaladsl.Http
+import org.apache.pekko.http.scaladsl.model.HttpHeader.ParsingResult
+import org.apache.pekko.http.scaladsl.model._
+import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshal
 
 import scala.concurrent.ExecutionContext
 

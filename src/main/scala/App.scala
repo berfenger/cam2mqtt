@@ -1,6 +1,6 @@
 package net.bfgnet.cam2mqtt
 
-import akka.actor.typed.ActorSystem
+import org.apache.pekko.actor.typed.ActorSystem
 import config.ConfigManager
 import http.HttpRoutes
 import system.{O2MActorSystem, O2MCommand}

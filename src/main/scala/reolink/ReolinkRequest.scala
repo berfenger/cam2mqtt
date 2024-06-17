@@ -5,10 +5,10 @@ import java.net.URLEncoder
 import java.security.SecureRandom
 import java.security.cert.X509Certificate
 
-import akka.actor.ClassicActorSystemProvider
-import akka.http.scaladsl.model._
-import akka.http.scaladsl.unmarshalling.Unmarshal
-import akka.http.scaladsl.{ConnectionContext, Http}
+import org.apache.pekko.actor.ClassicActorSystemProvider
+import org.apache.pekko.http.scaladsl.model._
+import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshal
+import org.apache.pekko.http.scaladsl.{ConnectionContext, Http}
 import com.fasterxml.jackson.annotation.JsonInclude.Include
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.scala.DefaultScalaModule

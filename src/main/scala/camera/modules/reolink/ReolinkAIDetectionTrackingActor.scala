@@ -1,8 +1,8 @@
 package net.bfgnet.cam2mqtt
 package camera.modules.reolink
 
-import akka.actor.typed.{ActorRef, Behavior}
-import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
+import org.apache.pekko.actor.typed.{ActorRef, Behavior}
+import org.apache.pekko.actor.typed.scaladsl.{ActorContext, Behaviors}
 import camera.CameraProtocol.{CameraCmd, WrappedModuleCmd}
 import reolink.{GetAiObjectState, GetAiStateCmdResponse, ReolinkHost, ReolinkRequests}
 import utils.ActorContextImplicits

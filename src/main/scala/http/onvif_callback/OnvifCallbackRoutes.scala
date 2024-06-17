@@ -1,9 +1,9 @@
 package net.bfgnet.cam2mqtt
 package http.onvif_callback
 
-import akka.actor.ClassicActorSystemProvider
-import akka.http.scaladsl.server.Directives._
-import akka.http.scaladsl.server.Route
+import org.apache.pekko.actor.ClassicActorSystemProvider
+import org.apache.pekko.http.scaladsl.server.Directives._
+import org.apache.pekko.http.scaladsl.server.Route
 import camera.CameraManProtocol.RouteCameraCommand
 import camera.CameraProtocol.CameraModuleMessage
 import camera.modules.onvif.OnvifModule

@@ -1,7 +1,7 @@
 package net.bfgnet.cam2mqtt
 package mqtt
 
-import akka.stream.alpakka.mqtt.MqttMessage
+import org.apache.pekko.stream.connectors.mqtt.MqttMessage
 import camera.CameraManProtocol.RouteCameraCommand
 import camera.CameraProtocol.CameraModuleAction
 import camera.modules.{CameraModules, MqttCameraModule}

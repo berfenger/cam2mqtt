@@ -9,9 +9,9 @@ import onvif.OnvifGetPropertiesRequests.OnvifCapabilitiesResponse
 import onvif.OnvifRequests
 import utils.ActorContextImplicits
 
-import akka.actor.typed.scaladsl.ActorContext
-import akka.stream.alpakka.mqtt.MqttMessage
-import akka.util.ByteString
+import org.apache.pekko.actor.typed.scaladsl.ActorContext
+import org.apache.pekko.stream.connectors.mqtt.MqttMessage
+import org.apache.pekko.util.ByteString
 
 import java.util.concurrent.TimeUnit
 import scala.collection.mutable

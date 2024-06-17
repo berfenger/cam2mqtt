@@ -10,8 +10,8 @@ import onvif.OnvifRequests
 import onvif.OnvifSubscriptionRequests.SubscriptionInfo
 import utils.ActorContextImplicits
 
-import akka.actor.typed.scaladsl.Behaviors
-import akka.actor.typed.{ActorRef, Behavior}
+import org.apache.pekko.actor.typed.scaladsl.Behaviors
+import org.apache.pekko.actor.typed.{ActorRef, Behavior}
 
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}

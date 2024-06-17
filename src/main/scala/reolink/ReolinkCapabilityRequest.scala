@@ -1,7 +1,7 @@
 package net.bfgnet.cam2mqtt
 package reolink
 
-import akka.actor.ClassicActorSystemProvider
+import org.apache.pekko.actor.ClassicActorSystemProvider
 import camera.CameraActionProtocol.NightVisionMode
 import camera.modules.reolink.{AiDetectionMode, ReolinkCapabilities, ReolinkModel, ReolinkState}
 

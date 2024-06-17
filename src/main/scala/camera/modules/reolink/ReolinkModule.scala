@@ -1,10 +1,10 @@
 package net.bfgnet.cam2mqtt
 package camera.modules.reolink
 
-import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
-import akka.actor.typed.{ActorRef, Behavior}
-import akka.stream.alpakka.mqtt.MqttMessage
-import akka.util.ByteString
+import org.apache.pekko.actor.typed.scaladsl.{ActorContext, Behaviors}
+import org.apache.pekko.actor.typed.{ActorRef, Behavior}
+import org.apache.pekko.stream.connectors.mqtt.MqttMessage
+import org.apache.pekko.util.ByteString
 import camera.CameraActionProtocol._
 import camera.CameraConfig.{CameraInfo, CameraModuleConfig, ReolinkCameraModuleConfig}
 import camera.CameraProtocol._

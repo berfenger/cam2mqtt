@@ -1,9 +1,9 @@
 package net.bfgnet.cam2mqtt
 package http
 
-import akka.actor.ClassicActorSystemProvider
-import akka.http.scaladsl.Http
-import akka.http.scaladsl.server.Route
+import org.apache.pekko.actor.ClassicActorSystemProvider
+import org.apache.pekko.http.scaladsl.Http
+import org.apache.pekko.http.scaladsl.server.Route
 import http.onvif_callback.OnvifCallbackRoutes
 
 import scala.concurrent.ExecutionContext

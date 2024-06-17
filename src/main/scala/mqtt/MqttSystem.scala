@@ -9,15 +9,15 @@ import mqtt.MqttProtocol._
 import system.{O2MCommand, WrappedMqttConnectionCmd}
 import utils.ActorContextImplicits
 
-import akka.Done
-import akka.actor.ActorRef
-import akka.actor.typed.scaladsl.Behaviors
-import akka.actor.typed.scaladsl.adapter._
-import akka.actor.typed.{Behavior, SupervisorStrategy, ActorRef => TypedActorRef}
-import akka.stream.alpakka.mqtt.scaladsl.{MqttFlow, MqttMessageWithAck}
-import akka.stream.alpakka.mqtt.{MqttConnectionSettings, MqttMessage, MqttQoS, MqttSubscriptions}
-import akka.stream.scaladsl.{Flow, Keep, RunnableGraph, Sink, Source}
-import akka.stream.{ActorAttributes, CompletionStrategy, OverflowStrategy, Supervision}
+import org.apache.pekko.Done
+import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.actor.typed.scaladsl.Behaviors
+import org.apache.pekko.actor.typed.scaladsl.adapter._
+import org.apache.pekko.actor.typed.{Behavior, SupervisorStrategy, ActorRef => TypedActorRef}
+import org.apache.pekko.stream.connectors.mqtt.scaladsl.{MqttFlow, MqttMessageWithAck}
+import org.apache.pekko.stream.connectors.mqtt.{MqttConnectionSettings, MqttMessage, MqttQoS, MqttSubscriptions}
+import org.apache.pekko.stream.scaladsl.{Flow, Keep, RunnableGraph, Sink, Source}
+import org.apache.pekko.stream.{ActorAttributes, CompletionStrategy, OverflowStrategy, Supervision}
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence
 
 import javax.net.ssl.SSLContext

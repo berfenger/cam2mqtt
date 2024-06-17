@@ -4,7 +4,7 @@ package reolink
 import java.time.{ZoneId, ZoneOffset}
 import java.util.{Calendar, GregorianCalendar, TimeZone}
 
-import akka.actor.{ClassicActorSystemProvider, Scheduler}
+import org.apache.pekko.actor.{ClassicActorSystemProvider, Scheduler}
 import com.fasterxml.jackson.annotation.JsonInclude.Include
 import com.fasterxml.jackson.annotation.{JsonIgnoreProperties, JsonInclude}
 import camera.CameraActionProtocol.NightVisionMode

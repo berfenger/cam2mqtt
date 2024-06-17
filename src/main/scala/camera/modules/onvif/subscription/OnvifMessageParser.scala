@@ -4,7 +4,7 @@ package camera.modules.onvif.subscription
 import camera.CameraProtocol.{CameraEvent, CameraMotionEvent, CameraObjectDetectionEvent, CameraVisitorEvent}
 import camera.modules.onvif.OnvifModule
 
-import akka.actor.typed.scaladsl.ActorContext
+import org.apache.pekko.actor.typed.scaladsl.ActorContext
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
 import org.jsoup.parser.Parser

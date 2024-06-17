@@ -7,10 +7,10 @@ import camera.modules.CameraModules
 import camera.modules.reolink.ReolinkModule
 import eventbus.CameraEventBus
 
-import akka.actor.ActorSystem
-import akka.actor.typed._
-import akka.actor.typed.scaladsl.adapter._
-import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.typed._
+import org.apache.pekko.actor.typed.scaladsl.adapter._
+import org.apache.pekko.actor.typed.scaladsl.{ActorContext, Behaviors}
 
 import scala.concurrent.duration._
 

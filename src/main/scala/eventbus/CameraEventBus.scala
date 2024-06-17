@@ -1,8 +1,8 @@
 package net.bfgnet.cam2mqtt
 package eventbus
 
-import akka.actor.ActorRef
-import akka.event.{EventBus, LookupClassification}
+import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.event.{EventBus, LookupClassification}
 import camera.CameraProtocol.{CameraAvailableEvent, CameraEvent, CameraMotionEvent, CameraObjectDetectionEvent}
 import eventbus.CameraEventBus._
 

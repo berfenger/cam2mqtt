@@ -1,6 +1,6 @@
 ThisBuild / version := "1.0"
 
-ThisBuild / scalaVersion := "2.13.10"
+ThisBuild / scalaVersion := "2.13.14"
 
 lazy val root = (project in file("."))
   .settings(
@@ -12,14 +12,14 @@ enablePlugins(JavaAppPackaging, AshScriptPlugin)
 
 Global / excludeLintKeys += idePackagePrefix
 
-val AkkaVersion = "2.6.20"
-val AkkaHttpVersion = "10.2.9"
+val PekkoVersion = "1.0.2"
+val PekkoHttpVersion = "1.0.1"
 libraryDependencies ++= Seq(
     "org.scalatest" %% "scalatest" % "3.2.15" % Test,
-    "com.typesafe.akka" %% "akka-actor-typed" % AkkaVersion,
-    "com.typesafe.akka" %% "akka-stream" % AkkaVersion,
-    "com.typesafe.akka" %% "akka-http" % AkkaHttpVersion,
-    "com.lightbend.akka" %% "akka-stream-alpakka-mqtt" % "3.0.4",
+    "org.apache.pekko" %% "pekko-actor-typed" % PekkoVersion,
+    "org.apache.pekko" %% "pekko-stream" % PekkoVersion,
+    "org.apache.pekko" %% "pekko-http" % PekkoHttpVersion,
+    "org.apache.pekko" %% "pekko-connectors-mqtt" % PekkoVersion,
     "commons-codec" % "commons-codec" % "1.15",
     "org.jsoup" % "jsoup" % "1.13.1",
     "ch.qos.logback" % "logback-classic" % "1.2.3",

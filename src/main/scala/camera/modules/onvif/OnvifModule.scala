@@ -11,9 +11,9 @@ import eventbus.CameraEventBus
 import onvif.OnvifGetPropertiesRequests.OnvifCapabilitiesResponse
 import utils.ActorContextImplicits
 
-import akka.actor.Cancellable
-import akka.actor.typed.scaladsl.Behaviors
-import akka.actor.typed.{ActorRef, Behavior, PostStop, Terminated}
+import org.apache.pekko.actor.Cancellable
+import org.apache.pekko.actor.typed.scaladsl.Behaviors
+import org.apache.pekko.actor.typed.{ActorRef, Behavior, PostStop, Terminated}
 
 sealed trait OnvifModuleCmd
 

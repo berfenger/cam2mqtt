@@ -1,8 +1,8 @@
 package net.bfgnet.cam2mqtt
 package utils
 
-import akka.actor.ClassicActorSystemProvider
-import akka.actor.typed.scaladsl.ActorContext
+import org.apache.pekko.actor.ClassicActorSystemProvider
+import org.apache.pekko.actor.typed.scaladsl.ActorContext
 
 import scala.concurrent.ExecutionContextExecutor
 

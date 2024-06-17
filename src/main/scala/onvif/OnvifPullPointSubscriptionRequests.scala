@@ -4,7 +4,7 @@ package onvif
 import java.text.SimpleDateFormat
 import java.time.ZoneId
 
-import akka.actor.ClassicActorSystemProvider
+import org.apache.pekko.actor.ClassicActorSystemProvider
 import onvif.OnvifSubscriptionRequests.SubscriptionInfo
 import utils.DateTimeUtils
 import org.jsoup.Jsoup

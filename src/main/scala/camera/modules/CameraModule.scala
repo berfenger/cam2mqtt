@@ -1,7 +1,7 @@
 package net.bfgnet.cam2mqtt
 package camera.modules
 
-import akka.actor.typed.{ActorRef, Behavior}
+import org.apache.pekko.actor.typed.{ActorRef, Behavior}
 import camera.CameraConfig.{CameraInfo, CameraModuleConfig}
 import camera.CameraProtocol.CameraCmd
 

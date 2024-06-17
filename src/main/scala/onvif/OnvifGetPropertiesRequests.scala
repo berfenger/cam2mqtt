@@ -5,7 +5,7 @@ import java.text.SimpleDateFormat
 import java.time.ZoneId
 import java.util.{Calendar, GregorianCalendar, TimeZone}
 
-import akka.actor.ClassicActorSystemProvider
+import org.apache.pekko.actor.ClassicActorSystemProvider
 import onvif.OnvifGetPropertiesRequests.{OnvifCapabilitiesResponse, OnvifDateTimeResponse, OnvifEventPropertiesResponse}
 import onvif.OnvifGetPropertiesTemplates.DATETIME_PARSER
 import utils.DateTimeUtils
