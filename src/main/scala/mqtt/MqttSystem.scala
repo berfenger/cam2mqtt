@@ -163,6 +163,10 @@ object MqttSystem extends ActorContextImplicits {
                     Try {
                         MqttCommands.inputCommand(baseTopic, ev.message)
                     }
+                    ev
+                }
+                .mapAsyncUnordered(4) {
+                    _.ack()
                 }
                 .toMat(Sink.ignore)(Keep.both)
                 .withAttributes(stratAlwaysStop)

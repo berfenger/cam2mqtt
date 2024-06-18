@@ -66,7 +66,11 @@ object O2MActorSystem {
                     context.watch(cameraManRef)
                     running(Some(cameraManRef), mqttActor)
                 case Terminate =>
-                    cameraManActor.foreach(_ ! cman.Terminate)
+                    if (cameraManActor.toList.nonEmpty) {
+                        cameraManActor.foreach(_ ! cman.Terminate)
+                    } else {
+                        context.stop(mqttActor)
+                    }
                     finishing(cameraManActor.toList, Option(mqttActor))
             }
         }
