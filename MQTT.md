@@ -28,6 +28,7 @@
     cam2mqtt/camera/{cameraId}/state/reolink/audio/volume 0-100
     cam2mqtt/camera/{cameraId}/state/reolink/spotlight/state on/off
     cam2mqtt/camera/{cameraId}/state/reolink/spotlight/brightness 0-100
+    cam2mqtt/camera/{cameraId}/state/reolink/privacy_mask on/off
 
 ##### Commands
     cam2mqtt/camera/{cameraId}/command/reolink/nightvision auto/on/off
@@ -41,6 +42,7 @@
     cam2mqtt/camera/{cameraId}/command/reolink/alarm/play on/off/1-100
     cam2mqtt/camera/{cameraId}/command/reolink/spotlight/state on/off
     cam2mqtt/camera/{cameraId}/command/reolink/spotlight/brightness 0-100
+    cam2mqtt/camera/{cameraId}/command/reolink/privacy_mask on/off
 
 
 ##### Motion events (AI detection)

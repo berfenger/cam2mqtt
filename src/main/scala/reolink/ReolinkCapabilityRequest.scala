@@ -26,6 +26,7 @@ trait ReolinkCapabilityRequest extends ReolinkRequest {
             ReolinkCmd("GetAlarm", 1, GetAlarmCommand(GetAlarmCommandParams(0, "md"))),
             ReolinkCmd("GetWhiteLed", 0, Channel(0)),
             ReolinkCmd("GetAudioCfg", 0, Channel(0)),
+            ReolinkCmd("GetMask", 0, Channel(0)),
             ReolinkCmd("GetDevInfo", 0, null)
         )
         for {
@@ -65,6 +66,7 @@ trait ReolinkCapabilityRequest extends ReolinkRequest {
             case "GetWhiteLed" => Try(parseGetWhiteLed(caps, state, result)).toOption.getOrElse((caps, state))
             case "GetAudioCfg" => Try(parseGetAudioCfg(caps, state, result)).toOption.getOrElse((caps, state))
             case "GetDevInfo" => Try(parseGetDevInfo(caps, state, result)).toOption.getOrElse((caps, state))
+            case "GetMask" => Try(parseGetMask(caps, state, result)).toOption.getOrElse((caps, state))
             case _ => (caps, state)
         }
     }
@@ -212,6 +214,25 @@ trait ReolinkCapabilityRequest extends ReolinkRequest {
                     OM.readValue(json.getJSONObject("DevInfo").toString, classOf[ReolinkModel])
                 }.toOption
                 (caps.copy(model = params), state)
+        }
+    }
+
+    private def parseGetMask(caps: ReolinkCapabilities, state: ReolinkState, result: Either[ReolinkCmdResponseError, JSONObject]): (ReolinkCapabilities, ReolinkState) = {
+        result match {
+            case Left(_) => (caps, state)
+            case Right(json) =>
+                val privacyMaskOn = Try {
+                    val area = OM.readValue(json.toString, classOf[SetMaskCommand])
+                    isFullscreenPrivacyMask(area.Mask.area) && area.Mask.enable == 1
+                }.toOption
+                (caps, state.copy(privacyMask = privacyMaskOn))
+        }
+    }
+
+    private def isFullscreenPrivacyMask(area: List[MaskArea]): Boolean = {
+        area.exists { mask =>
+            mask.block.x == 0 && mask.block.y == 0 &&
+                mask.block.height == mask.screen.height && mask.block.width == mask.screen.width
         }
     }
 

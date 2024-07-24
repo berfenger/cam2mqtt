@@ -53,6 +53,7 @@ For now, only two modules are implemented:
     * Turn on/off spotlight and change brightness
     * Change audio volume
     * Play alarm
+    * Enable/disable fullscreen privacy mask
   * AI powered object detection
     * Person detection
     * Vehicle detection
