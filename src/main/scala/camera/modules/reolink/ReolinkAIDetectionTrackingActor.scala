@@ -4,7 +4,7 @@ package camera.modules.reolink
 import org.apache.pekko.actor.typed.{ActorRef, Behavior}
 import org.apache.pekko.actor.typed.scaladsl.{ActorContext, Behaviors}
 import camera.CameraProtocol.{CameraCmd, WrappedModuleCmd}
-import reolink.{GetAiObjectState, GetAiStateCmdResponse, ReolinkHost, ReolinkRequests}
+import reolink.{GetAiObjectState, GetAiStateCmdResponse, ReolinkHostWithClient}
 import utils.ActorContextImplicits
 
 import scala.concurrent.duration._
@@ -26,15 +26,15 @@ object ReolinkAIDetectionTrackingActor extends ActorContextImplicits {
 
     case class ReolinkAIMotionDetectionStateUpdate(key: String, motion: Boolean)
 
-    def apply(parent: ActorRef[CameraCmd], host: ReolinkHost): Behavior[AITrackerCmd] =
+    def apply(parent: ActorRef[CameraCmd], host: ReolinkHostWithClient[_]): Behavior[AITrackerCmd] =
         running(parent, host, Nil, first = true)
 
-    private def running(parent: ActorRef[CameraCmd], host: ReolinkHost, states: List[AIDetectionState], first: Boolean = false): Behavior[AITrackerCmd] = {
+    private def running(parent: ActorRef[CameraCmd], host: ReolinkHostWithClient[_], states: List[AIDetectionState], first: Boolean = false): Behavior[AITrackerCmd] = {
         Behaviors.setup { implicit context =>
             val sched = context.scheduleOnce(if (first) 500.millis else 2.seconds, context.self, CheckAIState)
             Behaviors.receiveMessagePartial {
                 case CheckAIState =>
-                    context.pipeToSelf(ReolinkRequests.getAiState(host)) {
+                    context.pipeToSelf(host.getAiState()) {
                         case Success(Some(value)) => GotAIStates(convertAIDetectionStates(value))
                         case Success(None) => GotAIStateFailure(None)
                         case Failure(err) => GotAIStateFailure(Option(err))
@@ -50,17 +50,17 @@ object ReolinkAIDetectionTrackingActor extends ActorContextImplicits {
         }
     }
 
-    private def waitingForCommand(parent: ActorRef[CameraCmd], host: ReolinkHost, states: List[AIDetectionState]): Behavior[AITrackerCmd] = {
+    private def waitingForCommand(parent: ActorRef[CameraCmd], host: ReolinkHostWithClient[_], states: List[AIDetectionState]): Behavior[AITrackerCmd] = {
         Behaviors.setup { implicit context =>
             context.setReceiveTimeout(1500.millis, GotAIStateFailure(None))
             Behaviors.receiveMessagePartial {
                 case GotAIStates(newStates) =>
                     // check state changes to notify
                     val statesChanged = newStates
-                            .filter(_.isSupported)
-                            .map { ns => ns -> states.find(_.key == ns.key).map(_.alarmState != ns.alarmState) }
-                            .filter { v => v._2.contains(true) || (v._2.isEmpty && v._1.alarmState) }
-                            .map(_._1)
+                        .filter(_.isSupported)
+                        .map { ns => ns -> states.find(_.key == ns.key).map(_.alarmState != ns.alarmState) }
+                        .filter { v => v._2.contains(true) || (v._2.isEmpty && v._1.alarmState) }
+                        .map(_._1)
                     statesChanged.foreach { s =>
                         parent ! WrappedModuleCmd(ReolinkAIMotionDetectionStateUpdate(s.key, motion = s.alarmState))
                     }

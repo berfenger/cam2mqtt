@@ -11,7 +11,7 @@ import camera.CameraProtocol._
 import camera.modules.reolink.ReolinkAIDetectionTrackingActor.{AITrackerCmd, ReolinkAIMotionDetectionStateUpdate}
 import camera.modules.{CameraModule, MqttCameraModule}
 import camera.{CameraActionProtocol, CameraProtocol}
-import reolink.{GetAiStateParams, ReolinkCmdResponse, ReolinkHost, ReolinkRequests}
+import reolink.{GetAiStateParams, ReolinkCmdResponse, ReolinkHost, ReolinkHostWithPlainAPIClient, ReolinkHostWithEncryptedAPIClient, ReolinkHostWithClient}
 import utils.ActorContextImplicits
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
@@ -77,13 +77,13 @@ object ReolinkModule extends CameraModule with MqttCameraModule with ActorContex
 
     private val ONOFF_VALUES = List("on", "off")
 
-    case class Setup(parent: ActorRef[CameraCmd], camera: CameraInfo, host: ReolinkHost, config: ReolinkCameraModuleConfig)
+    case class Setup(parent: ActorRef[CameraCmd], camera: CameraInfo, host: ReolinkHostWithClient[_], config: ReolinkCameraModuleConfig)
 
     override def createBehavior(camera: ActorRef[CameraCmd], info: CameraInfo, config: CameraModuleConfig): Behavior[CameraCmd] = {
 
         val modCfg = config match {
             case c: ReolinkCameraModuleConfig => c
-            case _ => ReolinkCameraModuleConfig(None, None, None, None, syncDateTime = false, None,
+            case _ => ReolinkCameraModuleConfig(None, None, None, None, None, syncDateTime = false, None,
                 enableSpotlight = None, enableAudio = None, enableAlarm = None)
         }
         val reoHost = ReolinkHost(info.host,
@@ -92,18 +92,21 @@ object ReolinkModule extends CameraModule with MqttCameraModule with ActorContex
             modCfg.altPassword.getOrElse(info.password),
             modCfg.useSSL.getOrElse(modCfg.port.forall(_ == 443))
         )
-        val setup = Setup(camera, info, reoHost, modCfg)
+        val apiReoHost = if (modCfg.useEncryptedHttpApi.getOrElse(false)) {
+            ReolinkHostWithEncryptedAPIClient(reoHost, None)
+        } else ReolinkHostWithPlainAPIClient(reoHost, None)
+        val setup = Setup(camera, info, apiReoHost, modCfg)
         if (modCfg.syncDateTime) {
             initWithSyncTime(setup)
         } else {
-            gettingState(Setup(camera, info, reoHost, modCfg))
+            gettingState(Setup(camera, info, apiReoHost, modCfg))
         }
     }
 
     private def initWithSyncTime(setup: Setup): Behavior[CameraCmd] = {
         Behaviors.setup { implicit context =>
             Behaviors.withStash(100) { buffer =>
-                val f = ReolinkRequests.updateTimeIfNeeded(setup.host, maxSkewMillis = 5000)
+                val f = setup.host.updateTimeIfNeeded(maxSkewMillis = 5000)
                 context.pipeToSelf(f) {
                     case Success(None) => WrappedModuleCmd("nu")
                     case Success(Some(r)) if r.isOk => WrappedModuleCmd(if (r.isOk) "ok" else r.errorException)
@@ -136,7 +139,7 @@ object ReolinkModule extends CameraModule with MqttCameraModule with ActorContex
     private def gettingState(setup: Setup): Behavior[CameraCmd] = {
         Behaviors.setup { implicit context =>
             // launch get capabilities and state
-            context.pipeToSelf(ReolinkRequests.getCapabilities(setup.host).map(r => ReolinkInitialState(r._1, r._2))) {
+            context.pipeToSelf(setup.host.getCapabilities().map(r => ReolinkInitialState(r._1, r._2))) {
                 case Success(value) =>
                     WrappedModuleCmd(value)
                 case Failure(exception) =>
@@ -215,7 +218,7 @@ object ReolinkModule extends CameraModule with MqttCameraModule with ActorContex
         Behaviors.setup { implicit context =>
             Behaviors.receiveMessagePartial[CameraCmd] {
                 case CameraModuleAction(_, _, req@SetNightVisionActionRequest(mode, replyTo)) if caps.nightVision =>
-                    val a = ReolinkRequests.setNightVision(setup.host, mode)
+                    val a = setup.host.setNightVision(mode)
                     context.pipeToSelf(a)(wrapGenericResponse(req))
                     awaitingCommandResult(setup, caps, aiDetectionTrackingActor, replyTo)
                 case CameraModuleAction(_, _, req@PTZMoveActionRequest(pt, z, abs, replyTo)) if caps.ptzZoom =>
@@ -223,7 +226,7 @@ object ReolinkModule extends CameraModule with MqttCameraModule with ActorContex
                         replyTo.foreach(_ ! CameraActionResponse(Left(new IllegalArgumentException("only absolute zoom is currently supported"))))
                         Behaviors.same
                     } else {
-                        val a = ReolinkRequests.setZoom(setup.host, z.get.z)
+                        val a = setup.host.setZoom(z.get.z)
                         context.pipeToSelf(a)(wrapGenericResponse(req))
                         awaitingCommandResult(setup, caps, aiDetectionTrackingActor, replyTo)
                     }
@@ -231,33 +234,33 @@ object ReolinkModule extends CameraModule with MqttCameraModule with ActorContex
                     replyTo.foreach(_ ! CameraActionResponse(Left(new IllegalArgumentException("camera does not support PTZ control"))))
                     Behaviors.same
                 case CameraModuleAction(_, _, req@SetIrLightsActionRequest(mode, replyTo)) if caps.irlights =>
-                    val a = ReolinkRequests.setIrLights(setup.host, mode)
+                    val a = setup.host.setIrLights(mode)
                     context.pipeToSelf(a)(wrapGenericResponse(req))
                     awaitingCommandResult(setup, caps, aiDetectionTrackingActor, replyTo)
                 case CameraModuleAction(_, _, req@SetMotionSensActionRequest(mode, replyTo)) if caps.motionSens =>
-                    val a = ReolinkRequests.setAlarmSens(setup.host, mode)
+                    val a = setup.host.setAlarmSens(mode)
                     context.pipeToSelf(a)(wrapGenericResponse(req))
                     awaitingCommandResult(setup, caps, aiDetectionTrackingActor, replyTo)
                 case CameraModuleAction(_, _, req@SetFTPEnabledActionRequest(mode, replyTo)) if caps.ftp || caps.ftpV20 =>
-                    val a = if (caps.ftp) ReolinkRequests.setFTPEnabled(setup.host, mode)
-                    else ReolinkRequests.setFTPV20Enabled(setup.host, mode)
+                    val a = if (caps.ftp) setup.host.setFTPEnabled(mode)
+                    else setup.host.setFTPV20Enabled(mode)
                     context.pipeToSelf(a)(wrapGenericResponse(req))
                     awaitingCommandResult(setup, caps, aiDetectionTrackingActor, replyTo)
                 case CameraModuleAction(_, _, req@SetRecordEnabledActionRequest(mode, replyTo)) if caps.record || caps.recordV20 =>
-                    val a = if (caps.record) ReolinkRequests.setRecordEnabled(setup.host, mode)
-                    else ReolinkRequests.setRecordV20Enabled(setup.host, mode)
+                    val a = if (caps.record) setup.host.setRecordEnabled(mode)
+                    else setup.host.setRecordV20Enabled(mode)
                     context.pipeToSelf(a)(wrapGenericResponse(req))
                     awaitingCommandResult(setup, caps, aiDetectionTrackingActor, replyTo)
                 case CameraModuleAction(_, _, req@SetSpotlightActionRequest(enabled, brightness, replyTo)) if caps.spotlight =>
-                    val a = ReolinkRequests.setWhiteLed(setup.host, enabled = enabled, brightness = brightness)
+                    val a = setup.host.setWhiteLed(enabled = enabled, brightness = brightness)
                     context.pipeToSelf(a)(wrapGenericResponse(req))
                     awaitingCommandResult(setup, caps, aiDetectionTrackingActor, replyTo)
                 case CameraModuleAction(_, _, req@SetAudioVolumeActionRequest(volume, replyTo)) if caps.spotlight =>
-                    val a = ReolinkRequests.setAudioCfg(setup.host, volume)
+                    val a = setup.host.setAudioCfg(volume)
                     context.pipeToSelf(a)(wrapGenericResponse(req))
                     awaitingCommandResult(setup, caps, aiDetectionTrackingActor, replyTo)
                 case CameraModuleAction(_, _, req@PlayAlarmActionRequest(play, times, replyTo)) if caps.spotlight =>
-                    val a = ReolinkRequests.setAudioAlarmPlay(setup.host, play, times)
+                    val a = setup.host.setAudioAlarmPlay(play, times)
                     context.pipeToSelf(a)(wrapGenericResponse(req))
                     awaitingCommandResult(setup, caps, aiDetectionTrackingActor, replyTo)
                 case CameraModuleAction(_, _, req) =>
@@ -344,6 +347,7 @@ object ReolinkModule extends CameraModule with MqttCameraModule with ActorContex
         val ssl = from.getBool("ssl")
         val username = from.getString("username")
         val password = from.getString("password")
+        val useEncryptedHttpApi = from.getBool("use_encrypted_http_api")
         val aiDetectionMode = from.getString("ai_detection_mode").map(_.toLowerCase()) match {
             case Some("off") | Some("onvif") | Some("available") => Some(AiDetectionMode.Available)
             case Some("on_motion") => Some(AiDetectionMode.OnMotion)
@@ -353,7 +357,7 @@ object ReolinkModule extends CameraModule with MqttCameraModule with ActorContex
         val audio = from.getBool("audio")
         val alarm = from.getBool("alarm")
         val spotlight = from.getBool("spotlight")
-        ReolinkCameraModuleConfig(port, ssl, username, password, syncDateTime.orFalse, aiDetectionMode,
+        ReolinkCameraModuleConfig(port, ssl, username, password, useEncryptedHttpApi, syncDateTime.orFalse, aiDetectionMode,
             spotlight, audio, alarm)
     }
 

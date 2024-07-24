@@ -10,9 +10,9 @@ import org.codehaus.jettison.json.{JSONArray, JSONObject}
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 
-trait ReolinkCapabilityRequest extends ReolinkRequest {
+trait ReolinkCapabilityCommands extends ReolinkHostAPIClient {
 
-    def getCapabilities(host: ReolinkHost)
+    def getCapabilities()
                        (implicit _as: ClassicActorSystemProvider, _ec: ExecutionContext): Future[(ReolinkCapabilities, ReolinkState)] = {
         val cmds = List(
             ReolinkCmd("GetIrLights", 1, null),
@@ -29,7 +29,7 @@ trait ReolinkCapabilityRequest extends ReolinkRequest {
             ReolinkCmd("GetDevInfo", 0, null)
         )
         for {
-            cmdRes <- runGetCommands(host, cmds)
+            cmdRes <- runGetCommands(cmds)
             arr = new JSONArray(cmdRes)
             resultList = (0 until arr.length()).map(arr.getJSONObject).toList.map(parseCapResponse)
             res = parseCapsResult(resultList)
@@ -215,8 +215,8 @@ trait ReolinkCapabilityRequest extends ReolinkRequest {
         }
     }
 
-    private def runGetCommands(host: ReolinkHost, cmd: List[ReolinkCmd])
-                      (implicit _as: ClassicActorSystemProvider, _ec: ExecutionContext): Future[String] = {
-        reqPost(host, None, OM.writeValueAsString(cmd))
+    private def runGetCommands(cmd: List[ReolinkCmd])
+                              (implicit _as: ClassicActorSystemProvider, _ec: ExecutionContext): Future[String] = {
+        reqPost(None, OM.writeValueAsString(cmd))
     }
 }

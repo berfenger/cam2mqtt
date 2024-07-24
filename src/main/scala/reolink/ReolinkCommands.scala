@@ -15,6 +15,14 @@ import scala.concurrent.duration._
 
 sealed trait CommandParams
 
+// Login
+@JsonInclude(Include.NON_NULL)
+case class LoginCommand(Version: Int, Digest: LoginCommandDigest) extends CommandParams
+
+case class LoginCommandDigest(UserName: String, Realm: String, Method: String, Uri: String, Nonce: String,
+                              Nc: String, Cnonce: String, Qop: String, Response: String)
+
+// Isp
 case class IspCommandParams(channel: Int, dayNight: Option[String])
 
 case class IspCommand(Isp: IspCommandParams) extends CommandParams
@@ -45,11 +53,16 @@ case class SetAlarmCommand(Alarm: SetAlarmCommandParams) extends CommandParams
 // V10 ScheduleTable
 case class ScheduleTable(enable: Int, table: String) {
     def enabled(): ScheduleTable = this.copy(enable = 1)
+
     def disabled(): ScheduleTable = this.copy(enable = 0)
+
     def enabled(isEnabled: Boolean): ScheduleTable = if (isEnabled) enabled() else disabled()
+
     def withFullMotion(): ScheduleTable = this.copy(table = (0 until 168).map(_ => "1").mkString)
+
     def withNoMotion(): ScheduleTable = this.copy(table = (0 until 168).map(_ => "0").mkString)
 }
+
 // SetFtp
 @JsonIgnoreProperties(ignoreUnknown = true)
 case class SetFtpCommandParams(schedule: ScheduleTable)
@@ -78,6 +91,7 @@ case class SetRecV20Command(Rec: SetRecV20CommandParams) extends CommandParams
 @JsonIgnoreProperties(ignoreUnknown = true)
 case class GetAiObjectState(alarm_state: Int, support: Int) {
     def isSupported = support == 1
+
     def isDetected = alarm_state == 1
 }
 
@@ -128,9 +142,9 @@ case class ReolinkCmdResponse(cmd: String, code: Int, value: ReolinkCmdResponseV
     def errorString: Option[String] = error.map(_.errorString)
 }
 
-trait ReolinkCommands extends ReolinkRequest {
+trait ReolinkCommands extends ReolinkHostAPIClient {
 
-    def setNightVision(host: ReolinkHost, mode: NightVisionMode.Value)
+    def setNightVision(mode: NightVisionMode.Value)
                       (implicit _as: ClassicActorSystemProvider, _ec: ExecutionContext): Future[ReolinkCmdResponse] = {
         val convMode = mode match {
             case NightVisionMode.ForceOn => "Black&White"
@@ -138,26 +152,26 @@ trait ReolinkCommands extends ReolinkRequest {
             case NightVisionMode.Auto => "Auto"
         }
         val cmd = ReolinkCmd("SetIsp", 0, IspCommand(IspCommandParams(0, Option(convMode))))
-        runCommand(host, cmd)
+        runCommand(cmd)
     }
 
-    def setIrLights(host: ReolinkHost, mode: Boolean)
+    def setIrLights(mode: Boolean)
                    (implicit _as: ClassicActorSystemProvider, _ec: ExecutionContext): Future[ReolinkCmdResponse] = {
         val convMode = if (mode) "Auto" else "Off"
         val cmd = ReolinkCmd("SetIrLights", 0, IrLightsCommand(IrLightsCommandParams(convMode)))
-        runCommand(host, cmd)
+        runCommand(cmd)
     }
 
-    def setZoom(host: ReolinkHost, level: Int)
+    def setZoom(level: Int)
                (implicit _as: ClassicActorSystemProvider, _ec: ExecutionContext): Future[ReolinkCmdResponse] = {
         if (level < 0 || level > 100) throw new IllegalArgumentException("zoom out of bounds [0, 100]")
         // scale zoom between [0, 34]
         val scaledLevel = scala.math.round(level.toFloat / 100.0f * 34.0f)
         val cmd = ReolinkCmd("StartZoomFocus", 0, ZoomFocusCommand(ZoomFocusCommandParams(0, scaledLevel, "ZoomPos")))
-        runCommand(host, cmd)
+        runCommand(cmd)
     }
 
-    def setTime(host: ReolinkHost, timestamp: Long, timeZone: TimeZone)
+    def setTime(timestamp: Long, timeZone: TimeZone)
                (implicit _as: ClassicActorSystemProvider, _ec: ExecutionContext): Future[ReolinkCmdResponse] = {
 
         val date = new GregorianCalendar()
@@ -173,23 +187,23 @@ trait ReolinkCommands extends ReolinkRequest {
         val offsetSecs = timeZone.getRawOffset / 1000
 
         val cmd = ReolinkCmd("SetTime", 0, SetTimeCommand(SetTimeCommandParams(year, month, day, hour, min, sec, -offsetSecs)))
-        runCommand(host, cmd)
+        runCommand(cmd)
     }
 
-    def setSystemTime(host: ReolinkHost)
+    def setSystemTime()
                      (implicit _as: ClassicActorSystemProvider, _ec: ExecutionContext): Future[ReolinkCmdResponse] = {
 
         val timestamp = System.currentTimeMillis()
         val tz = TimeZone.getDefault
 
-        setTime(host, timestamp, tz)
+        setTime(timestamp, tz)
     }
 
-    def getTime(host: ReolinkHost)
+    def getTime()
                (implicit _as: ClassicActorSystemProvider, _ec: ExecutionContext): Future[GregorianCalendar] = {
 
         val cmd = ReolinkCmd("GetTime", 1, null)
-        reqPost(host, Option(cmd.cmd), OM.writeValueAsString(List(cmd))).map { r =>
+        reqPost(Option(cmd.cmd), OM.writeValueAsString(List(cmd))).map { r =>
             val time = new JSONObject(axeArray(r)).getJSONObject("value").getJSONObject("Time")
             val tzSecs = time.getInt("timeZone")
             val tzOffset = ZoneOffset.ofTotalSeconds(-tzSecs)
@@ -209,20 +223,20 @@ trait ReolinkCommands extends ReolinkRequest {
         }
     }
 
-    def updateTimeIfNeeded(host: ReolinkHost, maxSkewMillis: Long)
+    def updateTimeIfNeeded(maxSkewMillis: Long)
                           (implicit _as: ClassicActorSystemProvider, _ec: ExecutionContext): Future[Option[ReolinkCmdResponse]] = {
         for {
-            current <- getTime(host)
+            current <- getTime()
             diff = scala.math.abs(current.getTimeInMillis - System.currentTimeMillis())
             needUpd = diff > maxSkewMillis
             r <- if (needUpd) {
                 for {
-                    set <- setSystemTime(host)
+                    set <- setSystemTime()
                     newTimeR <- if (set.isOk) {
                         // add a delay for increased realiability
                         implicit val _sch: Scheduler = _as.classicSystem.scheduler
                         postpone(3.seconds) {
-                            getTime(host).map { d =>
+                            getTime().map { d =>
                                 val diff = scala.math.abs(d.getTimeInMillis - System.currentTimeMillis())
                                 if (diff < maxSkewMillis) {
                                     set
@@ -235,106 +249,106 @@ trait ReolinkCommands extends ReolinkRequest {
         } yield r
     }
 
-    def getAlarmSens(host: ReolinkHost)
+    def getAlarmSens()
                     (implicit _as: ClassicActorSystemProvider, _ec: ExecutionContext): Future[JSONObject] = {
         val cmd = ReolinkCmd("GetAlarm", 1, GetAlarmCommand(GetAlarmCommandParams(0, "md")))
-        reqPost(host, Option(cmd.cmd), OM.writeValueAsString(List(cmd))).map {
+        reqPost(Option(cmd.cmd), OM.writeValueAsString(List(cmd))).map {
             r => new JSONObject(axeArray(r)).getJSONObject("value").getJSONObject("Alarm")
         }
     }
 
-    def setAlarmSens(host: ReolinkHost, sens: Int)
+    def setAlarmSens(sens: Int)
                     (implicit _as: ClassicActorSystemProvider, _ec: ExecutionContext): Future[ReolinkCmdResponse] = {
         if (sens < 0 || sens > 100) throw new IllegalArgumentException("zoom out of bounds [0, 100]")
         // scale sens between [1, 50]
         val scaledSens = scala.math.round(sens.toFloat / 100.0f * 49.0f)
         // sensitivity need to be inverted. 100 means no motion detection, 0 means full sensitivity
         val invertedSens = 50 - scaledSens
-        getAlarmSens(host).flatMap { r =>
+        getAlarmSens().flatMap { r =>
             val params = OM.readValue(r.toString, classOf[SetAlarmCommandParams])
             val updParams = params.copy(sens = params.sens.map(_.copy(sensitivity = invertedSens)))
             val cmd = ReolinkCmd("SetAlarm", 1, SetAlarmCommand(updParams))
-            runCommand(host, cmd)
+            runCommand(cmd)
         }
     }
 
-    def setFTPEnabled(host: ReolinkHost, enabled: Boolean)
-                    (implicit _as: ClassicActorSystemProvider, _ec: ExecutionContext): Future[ReolinkCmdResponse] = {
+    def setFTPEnabled(enabled: Boolean)
+                     (implicit _as: ClassicActorSystemProvider, _ec: ExecutionContext): Future[ReolinkCmdResponse] = {
         val sched = ScheduleTable(-1, null).enabled(enabled).withFullMotion()
         val cmd = ReolinkCmd("SetFtp", 0, SetFtpCommand(SetFtpCommandParams(sched)))
-        reqPost(host, Option(cmd.cmd), OM.writeValueAsString(List(cmd))).map {
+        reqPost(Option(cmd.cmd), OM.writeValueAsString(List(cmd))).map {
             r => parseCommandResponse(r)
         }
     }
 
-    def setFTPV20Enabled(host: ReolinkHost, enabled: Boolean)
-                     (implicit _as: ClassicActorSystemProvider, _ec: ExecutionContext): Future[ReolinkCmdResponse] = {
+    def setFTPV20Enabled(enabled: Boolean)
+                        (implicit _as: ClassicActorSystemProvider, _ec: ExecutionContext): Future[ReolinkCmdResponse] = {
         val cmd = ReolinkCmd("SetFtpV20", 0, SetFtpV20Command(SetFtpV20CommandParams(if (enabled) 1 else 0)))
-        reqPost(host, Option(cmd.cmd), OM.writeValueAsString(List(cmd))).map {
+        reqPost(Option(cmd.cmd), OM.writeValueAsString(List(cmd))).map {
             r => parseCommandResponse(r)
         }
     }
 
-    def setRecordEnabled(host: ReolinkHost, enabled: Boolean)
-                     (implicit _as: ClassicActorSystemProvider, _ec: ExecutionContext): Future[ReolinkCmdResponse] = {
+    def setRecordEnabled(enabled: Boolean)
+                        (implicit _as: ClassicActorSystemProvider, _ec: ExecutionContext): Future[ReolinkCmdResponse] = {
         val sched = ScheduleTable(-1, null).enabled(enabled).withFullMotion()
         val cmd = ReolinkCmd("SetRec", 0, SetRecCommand(SetRecCommandParams(sched)))
-        reqPost(host, Option(cmd.cmd), OM.writeValueAsString(List(cmd))).map {
+        reqPost(Option(cmd.cmd), OM.writeValueAsString(List(cmd))).map {
             r => parseCommandResponse(r)
         }
     }
 
-    def setRecordV20Enabled(host: ReolinkHost, enabled: Boolean)
-                        (implicit _as: ClassicActorSystemProvider, _ec: ExecutionContext): Future[ReolinkCmdResponse] = {
+    def setRecordV20Enabled(enabled: Boolean)
+                           (implicit _as: ClassicActorSystemProvider, _ec: ExecutionContext): Future[ReolinkCmdResponse] = {
         val cmd = ReolinkCmd("SetRecV20", 0, SetRecV20Command(SetRecV20CommandParams(if (enabled) 1 else 0)))
-        reqPost(host, Option(cmd.cmd), OM.writeValueAsString(List(cmd))).map {
+        reqPost(Option(cmd.cmd), OM.writeValueAsString(List(cmd))).map {
             r => parseCommandResponse(r)
         }
     }
 
-    def getAiState(host: ReolinkHost)
-               (implicit _as: ClassicActorSystemProvider, _ec: ExecutionContext): Future[Option[GetAiStateCmdResponse]] = {
+    def getAiState()
+                  (implicit _as: ClassicActorSystemProvider, _ec: ExecutionContext): Future[Option[GetAiStateCmdResponse]] = {
         val cmd = ReolinkCmd("GetAiState", 0, Channel(0))
-        reqPost(host, Option(cmd.cmd), OM.writeValueAsString(List(cmd))).map { r =>
+        reqPost(Option(cmd.cmd), OM.writeValueAsString(List(cmd))).map { r =>
             val resp = OM.readValue(axeArray(r), classOf[GetAiStateCmdResponse])
             Option(resp).filter(_.code == 0).filter(_.cmd == "GetAiState").filter(_.value != null)
         }
     }
 
-    def runCommand(host: ReolinkHost, cmd: ReolinkCmd)
+    def runCommand(cmd: ReolinkCmd)
                   (implicit _as: ClassicActorSystemProvider, _ec: ExecutionContext): Future[ReolinkCmdResponse] = {
-        reqPost(host, Option(cmd.cmd), OM.writeValueAsString(List(cmd))).map {
+        reqPost(Option(cmd.cmd), OM.writeValueAsString(List(cmd))).map {
             r => parseCommandResponse(r)
         }
     }
 
-    def setWhiteLed(host: ReolinkHost, enabled: Option[Boolean] = None, brightness: Option[Int] = None)
-                           (implicit _as: ClassicActorSystemProvider, _ec: ExecutionContext): Future[ReolinkCmdResponse] = {
+    def setWhiteLed(enabled: Option[Boolean] = None, brightness: Option[Int] = None)
+                   (implicit _as: ClassicActorSystemProvider, _ec: ExecutionContext): Future[ReolinkCmdResponse] = {
         val p = SetWhiteLedCommandParams(enabled.map(v => if (v) 1 else 0).map(_.asInstanceOf[Integer]).orNull, 0, null,
             brightness.filter(v => v >= 0 && v <= 100).map(_.asInstanceOf[Integer]).orNull)
         val cmd = ReolinkCmd("SetWhiteLed", 0, SetWhiteLedCommand(p))
-        reqPost(host, Option(cmd.cmd), OM.writeValueAsString(List(cmd))).map {
+        reqPost(Option(cmd.cmd), OM.writeValueAsString(List(cmd))).map {
             r => parseCommandResponse(r)
         }
     }
 
-    def setAudioCfg(host: ReolinkHost, volume: Int)
+    def setAudioCfg(volume: Int)
                    (implicit _as: ClassicActorSystemProvider, _ec: ExecutionContext): Future[ReolinkCmdResponse] = {
         val p = SetAudioCfgCommandParams(0, volume)
         val cmd = ReolinkCmd("SetAudioCfg", 0, SetAudioCfgCommand(p))
-        reqPost(host, Option(cmd.cmd), OM.writeValueAsString(List(cmd))).map {
+        reqPost(Option(cmd.cmd), OM.writeValueAsString(List(cmd))).map {
             r => parseCommandResponse(r)
         }
     }
 
-    def setAudioAlarmPlay(host: ReolinkHost, play: Boolean, times: Option[Int])
-                   (implicit _as: ClassicActorSystemProvider, _ec: ExecutionContext): Future[ReolinkCmdResponse] = {
+    def setAudioAlarmPlay(play: Boolean, times: Option[Int])
+                         (implicit _as: ClassicActorSystemProvider, _ec: ExecutionContext): Future[ReolinkCmdResponse] = {
         val params = times match {
             case Some(times) if play => AudioAlarmPlayCommand("times", 0, times, null)
             case _ => AudioAlarmPlayCommand("manul", 0, null, if (play) 1 else 0)
         }
         val cmd = ReolinkCmd("AudioAlarmPlay", 0, params)
-        reqPost(host, Option(cmd.cmd), OM.writeValueAsString(List(cmd))).map {
+        reqPost(Option(cmd.cmd), OM.writeValueAsString(List(cmd))).map {
             r => parseCommandResponse(r)
         }
     }
