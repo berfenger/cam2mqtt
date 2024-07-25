@@ -230,7 +230,7 @@ trait ReolinkCapabilityRequest extends ReolinkRequest {
     }
 
     private def isFullscreenPrivacyMask(area: List[MaskArea]): Boolean = {
-        area.exists { mask =>
+        area != null && area.exists { mask =>
             mask.block.x == 0 && mask.block.y == 0 &&
                 mask.block.height == mask.screen.height && mask.block.width == mask.screen.width
         }
