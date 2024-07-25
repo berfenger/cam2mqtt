@@ -33,7 +33,7 @@ object ReolinkCapabilities {
         aiDetection = false, spotlight = false, audio = false, alarm = false)
 
     def defaultState: ReolinkState = ReolinkState(None, None, None, None, None, None, AiDetectionMode.UnSupported,
-        None, None, None, None)
+        None, None, None, None, None)
 }
 
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -47,7 +47,8 @@ case class ReolinkCapabilities(model: Option[ReolinkModel],
 case class ReolinkState(nightVision: Option[NightVisionMode.Value], irlights: Option[Boolean], motionSens: Option[Int],
                         ftp: Option[Boolean], record: Option[Boolean], zoomAbsLevel: Option[Int],
                         aiDetectionMode: AiDetectionMode.Value, aiDetectionState: Option[GetAiStateParams],
-                        spotlightState: Option[Boolean], spotlightBrightness: Option[Int], audioVolume: Option[Int])
+                        spotlightState: Option[Boolean], spotlightBrightness: Option[Int], audioVolume: Option[Int],
+                        privacyMask: Option[Boolean])
 
 case class ReolinkInitialState(caps: ReolinkCapabilities, state: ReolinkState)
 
@@ -68,10 +69,11 @@ object ReolinkModule extends CameraModule with MqttCameraModule with ActorContex
     private val CAM_PARAM_SPOTLIGHT_BRIGHTNESS = "spotlight/brightness"
     private val CAM_PARAM_AUDIO_VOLUME = "audio/volume"
     private val CAM_PARAM_MODEL = "model"
+    private val CAM_PARAM_PRIVACY_MASK = "privacy_mask"
 
     private val CAM_PARAMS = List(CAM_PARAM_NIGHTVISION, CAM_PARAM_IRLIGHTS, CAM_PARAM_MOTION_SENS, CAM_PARAM_FTP,
         CAM_PARAM_RECORD, CAM_PARAM_ZOOM_ABS, CAM_PARAM_AI_DETECTION_MODE, CAM_PARAM_SPOTLIGHT_STATE,
-        CAM_PARAM_SPOTLIGHT_BRIGHTNESS, CAM_PARAM_AUDIO_VOLUME, CAM_PARAM_MODEL)
+        CAM_PARAM_SPOTLIGHT_BRIGHTNESS, CAM_PARAM_AUDIO_VOLUME, CAM_PARAM_MODEL, CAM_PARAM_PRIVACY_MASK)
 
     private val NIGHVISION_VALUES = List("on", "off", "auto")
 
@@ -198,6 +200,9 @@ object ReolinkModule extends CameraModule with MqttCameraModule with ActorContex
                     caps.model.foreach {
                         updateModel(setup)
                     }
+                    state.privacyMask.foreach {
+                        updatePrivacyMask(setup)
+                    }
                     // init ReolinkAIDetectionTrackingActor if mode is continuous
                     val aiTrackerActor = if (state.aiDetectionMode == AiDetectionMode.Continuous) {
                         Some(context.spawn(ReolinkAIDetectionTrackingActor(context.self, setup.host), "reolinkAITracker"))
@@ -260,6 +265,10 @@ object ReolinkModule extends CameraModule with MqttCameraModule with ActorContex
                     val a = ReolinkRequests.setAudioAlarmPlay(setup.host, play, times)
                     context.pipeToSelf(a)(wrapGenericResponse(req))
                     awaitingCommandResult(setup, caps, aiDetectionTrackingActor, replyTo)
+                case CameraModuleAction(_, _, req@SetPrivacyMaskActionRequest(enabled, replyTo)) if caps.ftp || caps.ftpV20 =>
+                    val a = ReolinkRequests.setPrivacyMask(setup.host, if (enabled) ReolinkRequests.fullScreenPrivacyMask() else Nil)
+                    context.pipeToSelf(a)(wrapGenericResponse(req))
+                    awaitingCommandResult(setup, caps, aiDetectionTrackingActor, replyTo)
                 case CameraModuleAction(_, _, req) =>
                     req.replyTo.foreach(_ ! CameraActionResponse(Left(new IllegalArgumentException("operation not supported by camera"))))
                     Behaviors.same
@@ -315,6 +324,8 @@ object ReolinkModule extends CameraModule with MqttCameraModule with ActorContex
                                 brightness.foreach(updateSpotlightBrightness(setup))
                             case SetAudioVolumeActionRequest(volume, _) =>
                                 updateAudioVolume(setup)(volume)
+                            case SetPrivacyMaskActionRequest(enabled, _) =>
+                                updatePrivacyMask(setup)(enabled)
                             case _ =>
                         }
                     }
@@ -418,6 +429,12 @@ object ReolinkModule extends CameraModule with MqttCameraModule with ActorContex
                 Try(stringData.toInt).toOption.filter(v => v >= 1 && v <= 100).map { v =>
                     PlayAlarmActionRequest(play = true, Some(v), None)
                 }
+            case "privacy_mask" :: Nil if ONOFF_VALUES.contains(stringData) =>
+                val nv = stringData match {
+                    case "on" => true
+                    case "off" => false
+                }
+                Some(SetPrivacyMaskActionRequest(nv, None))
             case _ => None
         }
     }
@@ -475,6 +492,10 @@ object ReolinkModule extends CameraModule with MqttCameraModule with ActorContex
 
     private def updateAudioVolume(setup: Setup)(volume: Int): Unit = {
         setup.parent ! CameraModuleEvent(setup.camera.cameraId, moduleId, CameraStateIntEvent(setup.camera.cameraId, moduleId, CAM_PARAM_AUDIO_VOLUME, volume))
+    }
+
+    private def updatePrivacyMask(setup: Setup)(enabled: Boolean): Unit = {
+        setup.parent ! CameraModuleEvent(setup.camera.cameraId, moduleId, CameraStateBoolEvent(setup.camera.cameraId, moduleId, CAM_PARAM_PRIVACY_MASK, enabled))
     }
 
     private def updateModel(setup: Setup)(model: ReolinkModel): Unit = {

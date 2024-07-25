@@ -105,6 +105,17 @@ case class GetAiStateParams(channel: Int, dog_cat: GetAiObjectState, face: GetAi
 @JsonIgnoreProperties(ignoreUnknown = true)
 case class GetAiStateCmdResponse(cmd: String, code: Int, value: GetAiStateParams)
 
+// Get/Set Privacy mask
+case class MaskAreaBlock(height: Int, width: Int, x: Int, y: Int)
+
+case class MaskAreaScreen(height: Int, width: Int)
+
+case class MaskArea(block: MaskAreaBlock, screen: MaskAreaScreen)
+
+case class SetMaskCommandParams(channel: Int, area: List[MaskArea], enable: Int)
+
+case class SetMaskCommand(Mask: SetMaskCommandParams) extends CommandParams
+
 // Common
 case class Channel(channel: Int) extends CommandParams
 
@@ -337,6 +348,19 @@ trait ReolinkCommands extends ReolinkRequest {
         reqPost(host, Option(cmd.cmd), OM.writeValueAsString(List(cmd))).map {
             r => parseCommandResponse(r)
         }
+    }
+
+    def setPrivacyMask(host: ReolinkHost, mask: List[MaskArea])
+                      (implicit _as: ClassicActorSystemProvider, _ec: ExecutionContext): Future[ReolinkCmdResponse] = {
+        val cmd = ReolinkCmd("SetMask", 0, SetMaskCommand(SetMaskCommandParams(0, mask, 1)))
+        reqPost(host, Option(cmd.cmd), OM.writeValueAsString(List(cmd))).map {
+            r => parseCommandResponse(r)
+        }
+    }
+
+    def fullScreenPrivacyMask(): List[MaskArea] = {
+        val area = MaskArea(MaskAreaBlock(100, 100, 0, 0), MaskAreaScreen(100, 100))
+        List(area)
     }
 
     private def postpone[T](duration: FiniteDuration)(code: => Future[T])(implicit _ec: ExecutionContext, _sch: Scheduler): Future[T] = {

@@ -102,6 +102,9 @@ object CameraActionProtocol {
 
     case class PlayAlarmActionRequest(play: Boolean, times: Option[Int], override val replyTo: Option[ActorRef[CameraActionResponse]]) extends CameraActionRequest
 
+    // Privacy mask
+    case class SetPrivacyMaskActionRequest(enabled: Boolean, override val replyTo: Option[ActorRef[CameraActionResponse]]) extends CameraActionRequest
+
 }
 
 object CameraConfig {
